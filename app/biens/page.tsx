@@ -64,7 +64,7 @@ function CatalogueContent() {
         .order('created_at', { ascending: false })
         .range(from, to)
 
-      if (zone) query = query.ilike('zone_saisie', `%${zone}%`)
+      if (zone) query = query.ilike('zone_normalized', `%${normalize(zone)}%`)
       if (type) query = query.eq('property_type', type)
       if (transaction) query = query.eq('transaction_type', transaction)
 

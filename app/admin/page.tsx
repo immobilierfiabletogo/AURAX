@@ -245,7 +245,7 @@ export default function AdminPage() {
 
       <div className="adm">
         <div className="adm-top">
-        <div className="adm-logo">AURA<span>X</span></div>
+        <div className="adm-logo">AU<span>RAX</span></div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
     
           {/* AJOUT DU COMPTEUR ICI */}

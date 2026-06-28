@@ -23,7 +23,11 @@ export default function ModerationPage() {
   }, [])
 
   const handleAction = async (id: string, status: 'approved' | 'rejected') => {
-    await supabase.from('listings').update({ status }).eq('id', id)
+    const { error } = await supabase.from('listings').update({ status }).eq('id', id)
+    if (error) {
+      alert('Erreur : ' + error.message)
+      return
+    }
     setPending(prev => prev.filter(l => l.id !== id))
   }
 
