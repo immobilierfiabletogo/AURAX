@@ -14,6 +14,7 @@ export default function Navbar() {
   const [userType, setUserType] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
   const router = useRouter()
   const pathname = usePathname()
@@ -26,10 +27,11 @@ export default function Navbar() {
         setUser(user)
         const { data: profile } = await supabase
           .from('profiles')
-          .select('user_type')
+          .select('user_type,avatar_url')
           .eq('id', user.id)
           .single()
         setUserType(profile?.user_type ?? null)
+        setAvatarUrl(profile?.avatar_url ?? null)
       }
     }
     getUserData()
@@ -86,7 +88,7 @@ export default function Navbar() {
 
         <div className="flex flex-col leading-none">
           <span className="text-xl font-black tracking-tight text-slate-950">
-            AURA<span className="text-emerald-600">X</span>
+            AU<span className="text-emerald-600">RAX</span>
          </span>
 
          <span className="text-[10px] uppercase tracking-[2.5px] text-slate-400 font-bold">
@@ -124,7 +126,11 @@ export default function Navbar() {
                   className="flex items-center gap-1.5 p-1.5 pr-3 rounded-full border border-slate-200 hover:border-slate-300 bg-slate-50/50 hover:bg-slate-50 transition-all cursor-pointer"
                 >
                   <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-orange-700 flex items-center justify-center font-black text-xs text-slate-950 shadow-xs">
-                    {user.email?.[0]?.toUpperCase()}
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt="Profil" className="w-full h-full object-cover" />
+                    ) : (
+                      user.email?.[0]?.toUpperCase()
+                    )}
                   </div>
                   <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
                 </button>

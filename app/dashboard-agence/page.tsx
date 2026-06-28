@@ -63,7 +63,7 @@ export default function DashboardAgencePage() {
       if (!user) { router.push('/login'); return }
 
       const [{ data: p }, { data: l }] = await Promise.all([
-        supabase.from('profiles').select('full_name, user_type, subscription_status, phone_number').eq('id', user.id).single(),
+        supabase.from('profiles').select('full_name, user_type, subscription_status, phone_number, avatar_url').eq('id', user.id).single(),
         supabase.from('listings').select('id, title, price, zone_saisie, property_type, images_urls, is_boosted, boosted_until, created_at, whatsapp_clicks, views, is_active').eq('agent_id', user.id).order('created_at', { ascending: false })
       ])
 
@@ -127,7 +127,11 @@ export default function DashboardAgencePage() {
         {/* Profil de l'agence */}
         <div className="flex items-center gap-3 bg-slate-900/80 border border-slate-800/60 rounded-2xl p-3 mb-6 shadow-xs">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 font-black text-sm shadow-xs">
-            {initiale}
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt={nom} className="w-full h-full object-cover" />
+            ) : (
+              initiale
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-xs font-bold text-slate-100 truncate">{nom}</div>

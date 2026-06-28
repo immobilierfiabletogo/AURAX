@@ -71,7 +71,7 @@ export default function BienDetailPage() {
         if (data.agent_id) {
           const { data: agenceData } = await supabase
             .from('profiles')
-            .select('full_name, phone_number')
+            .select('full_name, phone_number, avatar_url')
             .eq('id', data.agent_id)
             .single();
           setAgence(agenceData);
@@ -250,19 +250,22 @@ export default function BienDetailPage() {
               
               {/* Profil sommaire de l'agent / Prop */}
               <div className="flex items-center gap-3.5 bg-slate-50 p-3.5 rounded-xl border border-slate-100 mb-6">
-                <div className="h-10 w-10 rounded-full bg-slate-900 text-white font-black text-xs flex items-center justify-center shadow-xs">
-                  {agence?.full_name?.[0]?.toUpperCase() ?? 'A'}
+                <div className="h-10 w-10 rounded-full bg-slate-900 overflow-hidden flex items-center justify-center shadow-xs shrink-0">
+                  {agence?.avatar_url ? (
+                    <img src={agence.avatar_url} alt={agence.full_name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-white font-black text-xs">
+                      {agence?.full_name?.[0]?.toUpperCase() ?? 'A'}
+                    </span>
+                  )}
                 </div>
-              <div>
-                <div className="text-xs font-bold text-slate-800">
-                  {agence?.full_name ?? 'Agence AURAX'}
+                <div>
+                  <div className="text-xs font-bold text-slate-800">{agence?.full_name ?? 'Agence AURAX'}</div>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 mt-0.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Réponse rapide
+                  </span>
                 </div>
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 mt-0.5">
-               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> 
-               Réponse rapide
-              </span>
-            </div>
-          </div>
+              </div>
 
               {/* Boutons de conversion immédiate */}
               <div className="space-y-2.5">
