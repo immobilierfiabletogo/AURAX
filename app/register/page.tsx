@@ -26,38 +26,30 @@ export default function RegisterPage() {
 
     try {
       // 2. Création de l'utilisateur dans l'Auth Supabase
-      const { data, error: signUpError } = await supabase.auth.signUp({ email, password })
-
-      if (signUpError) {
-        setError(signUpError.message)
-        setLoading(false)
-        return
+     const { data, error: signUpError } = await supabase.auth.signUp({
+       email,
+       password,
+       options: {
+       data: {
+         full_name: fullName,
+         phone_number: phone,
+         user_type: userType,
+       }
       }
+    })
 
-      if (data.user) {
-        // 3. Enregistrement ou mise à jour du profil avec .upsert()
-        const { error: profileError } = await supabase.from('profiles').upsert({
-          id: data.user.id,
-          full_name: fullName,
-          phone_number: phone,
-          user_type: userType,
-        })
+    if (signUpError) {
+      setError(signUpError.message)
+      setLoading(false)
+      return
+    }
 
-        if (profileError) {
-          console.error("Erreur de profil Supabase:", profileError)
-          setError(`Compte créé, mais impossible d'enregistrer vos infos : ${profileError.message}`)
-          setLoading(false)
-          return
-        }
-      }
-
-      // 4. Redirection selon le type de profil
-      if (userType === 'agence') {
-        router.push('/dashboard-agence')
-      } else {
-        router.push('/mon-espace')
-      }
-      router.refresh()
+    // Le profil est créé automatiquement par le trigger Supabase
+    // On affiche un message de confirmation email au lieu de rediriger
+    setError(null)
+    setLoading(false)
+    // On redirige vers une page de confirmation
+    router.push('/confirmation-email')
 
     } catch (err) {
       console.error("Erreur critique inattendue:", err)
