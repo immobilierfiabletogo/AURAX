@@ -11,8 +11,31 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "AURAX | Immobilier à Lomé",
-  description: "Trouvez votre bien immobilier à Lomé, Togo.",
-};
+  description: "Trouvez votre bien immobilier à Lomé, Togo. Appartements, maisons, villas et terrains disponibles sur AURAX.",
+  metadataBase: new URL('https://au-rax.com'),
+  openGraph: {
+    title: "AURAX | Immobilier à Lomé",
+    description: "La plateforme immobilière du Togo. Simple, rapide et vérifié.",
+    url: "https://au-rax.com",
+    siteName: "AURAX",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "AURAX — La plateforme immobilière du Togo",
+      }
+    ],
+    locale: "fr_TG",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AURAX | Immobilier à Lomé",
+    description: "La plateforme immobilière du Togo.",
+    images: ["/og-image.jpg"],
+  },
+}
 
 export default function RootLayout({
   children,
@@ -38,5 +61,4 @@ export default function RootLayout({
         </footer>
       </body>
     </html>
-  );
-}
+  )}

@@ -1,17 +1,19 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/utils/supabase'
 import Link from 'next/link'
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
   const supabase = createClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const searchParams = useSearchParams()
+  const confirmed = searchParams.get('confirmed')
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -73,6 +75,11 @@ export default function LoginPage() {
           <p className="auth-sub">Accédez à votre espace immobilier</p>
 
           <form onSubmit={handleLogin}>
+            {confirmed && (
+              <div style={{background:'#f0fdf4', border:'1px solid #bbf7d0', color:'#166534', padding:'12px 14px', borderRadius:'10px', fontSize:'13px', marginBottom:'16px', fontWeight:'600'}}>
+                ✅ Email confirmé avec succès. Connectez-vous maintenant.
+             </div>
+            )}
             {error && <div className="auth-error">{error}</div>}
 
             <div className="auth-field">
@@ -97,5 +104,13 @@ export default function LoginPage() {
         </div>
       </div>
     </>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
   )
 }
