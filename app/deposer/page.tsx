@@ -33,23 +33,45 @@ export default function DeposerPage() {
   const [errorMsg, setErrorMsg] = useState('')
 
   // Gérer la sélection des fichiers et générer les prévisualisations
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const filesArray = Array.from(e.target.files)
+  const compressImage = (file: File): Promise<File> => {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas')
+    const img = new Image()
+    const url = URL.createObjectURL(file)
     
-      // Vérifier la taille de chaque fichier
-      for (const file of filesArray) {
-        if (file.size > 2 * 1024 * 1024) {
-          setErrorMsg(`L'image "${file.name}" dépasse 2 Mo. Compressez-la avant de l'uploader.`)
-          return
+    img.onload = () => {
+      const maxWidth = 1200
+      const scale = img.width > maxWidth ? maxWidth / img.width : 1
+      canvas.width = img.width * scale
+      canvas.height = img.height * scale
+      
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      URL.revokeObjectURL(url)
+      
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }))
+        } else {
+          resolve(file)
         }
-      }
-
-      setSelectedFiles((prev) => [...prev, ...filesArray])
-      const newPreviews = filesArray.map(file => URL.createObjectURL(file))
-      setPreviews((prev) => [...prev, ...newPreviews])
+      }, 'image/jpeg', 0.8)
     }
+    img.src = url
+  })
+}
+
+const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  if (e.target.files) {
+    const filesArray = Array.from(e.target.files)
+    const compressedFiles = await Promise.all(
+      filesArray.map(file => compressImage(file))
+    )
+    setSelectedFiles((prev) => [...prev, ...compressedFiles])
+    const newPreviews = compressedFiles.map(file => URL.createObjectURL(file))
+    setPreviews((prev) => [...prev, ...newPreviews])
   }
+}
 
   // Supprimer une image de la liste avant soumission
   const removeImage = (index: number) => {
@@ -123,7 +145,8 @@ export default function DeposerPage() {
             contact_phone: contactPhone, // J'ai décommenté cette ligne
             images_urls: uploadedUrls,
             is_boosted: false,
-            is_active: true
+            is_active: true,
+            status: 'pending'
           }
         ])
 
@@ -285,7 +308,7 @@ export default function DeposerPage() {
                   />
                   <UploadCloud className="w-8 h-8 mx-auto text-slate-400 group-hover:text-emerald-600 transition-colors mb-2" />
                   <span className="block text-xs font-bold text-slate-700">Cliquez pour ajouter des photos</span>
-                  <span className="block text-[10px] text-slate-400 mt-0.5">Formats acceptés : JPG, PNG (Max 5Mo par image)</span>
+                  <span className="block text-[10px] text-slate-400 mt-0.5">Formats acceptés : JPG, PNG — compression automatique</span>
                 </div>
               </div>
 
