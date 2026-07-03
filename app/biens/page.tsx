@@ -129,13 +129,13 @@ function CatalogueContent() {
       {/* 1bis. TOGGLE BUDGET (STICKY, TOUT EN HAUT) */}
       <div className="sticky top-0 z-50 border-b border-slate-200/60 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-3">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1">
             {SEGMENTS.map((s) => (
               <button
                 key={s.value}
                 type="button"
                 onClick={() => handleSegmentClick(s.value)}
-                className={`px-4 py-2 rounded-full text-xs font-bold tracking-wide transition-all cursor-pointer ${
+                className={`shrink-0 px-4 py-2 rounded-full text-xs font-bold tracking-wide transition-all cursor-pointer whitespace-nowrap ${
                   segment === s.value
                     ? 'bg-emerald-600 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -148,8 +148,8 @@ function CatalogueContent() {
         </div>
       </div>
 
-      {/* 2. BARRE DE FILTRES FLOTTANTE (STICKY) */}
-      <div className="sticky top-[52px] z-40 border-b border-slate-200/50 bg-white/75 backdrop-blur-lg shadow-xs">
+      {/* 2. BARRE DE FILTRES (non sticky : visible à l'arrivée, scrolle avec la page) */}
+      <div className="border-b border-slate-200/50 bg-white/75 backdrop-blur-lg shadow-xs">
         <div className="mx-auto max-w-7xl px-6 py-4">
           <form className="flex flex-wrap items-center gap-3" onSubmit={handleFilter}>
             
