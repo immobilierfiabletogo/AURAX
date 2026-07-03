@@ -17,6 +17,7 @@ interface Listing {
   transaction_type: string
   images_urls: string[]
   is_boosted: boolean
+  segment: string | null
 }
 
 function formatPrix(prix: number) {
@@ -24,6 +25,14 @@ function formatPrix(prix: number) {
 }
 
 const ITEMS_PER_PAGE = 12
+
+const SEGMENTS = [
+  { value: '', label: 'Tous les biens' },
+  { value: 'pb', label: 'Petit budget' },
+  { value: 'bm', label: 'Budget moyen' },
+  { value: 'gb', label: 'Grand budget' },
+  { value: 'tgb', label: 'Très grand budget' },
+] as const
 
 const normalize = (str: string) => {
   return str
@@ -44,6 +53,7 @@ function CatalogueContent() {
   const zone = searchParams.get('zone') ?? ''
   const type = searchParams.get('type') ?? ''
   const transaction = searchParams.get('transaction') ?? ''
+  const segment = searchParams.get('segment') ?? ''
   const page = Number(searchParams.get('page') ?? 1)
 
   const [zoneInput, setZoneInput] = useState(zone)
@@ -58,7 +68,7 @@ function CatalogueContent() {
 
       let query = supabase
         .from('listings')
-        .select('id, title, price, zone_saisie, property_type, transaction_type, images_urls, is_boosted', { count: 'exact' })
+        .select('id, title, price, zone_saisie, property_type, transaction_type, images_urls, is_boosted, segment', { count: 'exact' })
         .eq('is_active', true)
         .order('is_boosted', { ascending: false })
         .order('created_at', { ascending: false })
@@ -67,6 +77,7 @@ function CatalogueContent() {
       if (zone) query = query.ilike('zone_normalized', `%${normalize(zone)}%`)
       if (type) query = query.eq('property_type', type)
       if (transaction) query = query.eq('transaction_type', transaction)
+      if (segment) query = query.eq('segment', segment)
 
       const { data, count } = await query
       setListings(data ?? [])
@@ -74,7 +85,18 @@ function CatalogueContent() {
       setLoading(false)
     }
     load()
-  }, [zone, type, transaction, page])
+  }, [zone, type, transaction, segment, page])
+
+  const handleSegmentClick = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value) {
+      params.set('segment', value)
+    } else {
+      params.delete('segment')
+    }
+    params.delete('page') // on repart de la page 1 en changeant de segment
+    router.push(`/biens?${params.toString()}`)
+  }
 
   const handleFilter = (e: React.FormEvent) => {
     e.preventDefault()
@@ -104,8 +126,30 @@ function CatalogueContent() {
         </div>
       </div>
 
+      {/* 1bis. TOGGLE BUDGET (STICKY, TOUT EN HAUT) */}
+      <div className="sticky top-0 z-50 border-b border-slate-200/60 bg-white">
+        <div className="mx-auto max-w-7xl px-6 py-3">
+          <div className="flex flex-wrap gap-2">
+            {SEGMENTS.map((s) => (
+              <button
+                key={s.value}
+                type="button"
+                onClick={() => handleSegmentClick(s.value)}
+                className={`px-4 py-2 rounded-full text-xs font-bold tracking-wide transition-all cursor-pointer ${
+                  segment === s.value
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* 2. BARRE DE FILTRES FLOTTANTE (STICKY) */}
-      <div className="sticky top-0 z-40 border-b border-slate-200/50 bg-white/75 backdrop-blur-lg shadow-xs">
+      <div className="sticky top-[52px] z-40 border-b border-slate-200/50 bg-white/75 backdrop-blur-lg shadow-xs">
         <div className="mx-auto max-w-7xl px-6 py-4">
           <form className="flex flex-wrap items-center gap-3" onSubmit={handleFilter}>
             
@@ -162,7 +206,7 @@ function CatalogueContent() {
                 Rechercher
               </button>
 
-              {(zone || type || transaction) && (
+              {(zone || type || transaction || segment) && (
                 <Link 
                   href="/biens" 
                   className="px-4 py-2.5 bg-white text-slate-500 border border-slate-200 rounded-xl text-sm font-semibold hover:text-slate-800 hover:bg-slate-50 transition-all text-center flex items-center justify-center gap-1"
