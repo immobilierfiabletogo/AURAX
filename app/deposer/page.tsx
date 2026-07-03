@@ -36,9 +36,16 @@ export default function DeposerPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const filesArray = Array.from(e.target.files)
-      setSelectedFiles((prev) => [...prev, ...filesArray])
+    
+      // Vérifier la taille de chaque fichier
+      for (const file of filesArray) {
+        if (file.size > 2 * 1024 * 1024) {
+          setErrorMsg(`L'image "${file.name}" dépasse 2 Mo. Compressez-la avant de l'uploader.`)
+          return
+        }
+      }
 
-      // Création des URLs de preview locales
+      setSelectedFiles((prev) => [...prev, ...filesArray])
       const newPreviews = filesArray.map(file => URL.createObjectURL(file))
       setPreviews((prev) => [...prev, ...newPreviews])
     }
