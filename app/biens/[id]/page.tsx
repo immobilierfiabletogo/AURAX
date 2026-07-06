@@ -42,6 +42,7 @@ export default function BienDetailPage() {
   const [loading, setLoading] = useState(true)
   const [activeImage, setActiveImage] = useState<string>('')
   const [agence, setAgence] = useState<any>(null)
+  const [isParticulier, setIsParticulier] = useState(false)
 
 
   const handleWhatsAppClick = async () => {
@@ -75,6 +76,14 @@ export default function BienDetailPage() {
             .eq('id', data.agent_id)
             .single();
           setAgence(agenceData);
+        }
+        if (data?.agent_id) {
+         const { data: profileData } = await supabase
+            .from('profiles')
+            .select('user_type')
+            .eq('id', data.agent_id)
+            .single()
+         setIsParticulier(profileData?.user_type === 'particulier')
         }
         if (data.images_urls && data.images_urls.length > 0) {
           setActiveImage(data.images_urls[0]);

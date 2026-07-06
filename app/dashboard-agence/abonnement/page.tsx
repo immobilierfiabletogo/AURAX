@@ -98,7 +98,7 @@ export default function AbonnementPage() {
             Ta preuve de paiement a été transmise. Ton abonnement sera activé dès validation par l'équipe AURAX, généralement en moins de 24h.
           </p>
           <button
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push('/dashboard-agence')}
             className="w-full px-6 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all"
           >
             Retour au tableau de bord

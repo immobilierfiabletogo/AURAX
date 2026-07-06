@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, Fragment } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase'
 import Link from 'next/link'
@@ -9,30 +9,12 @@ import { Bell } from 'lucide-react'
 const ADMIN_EMAIL = 'djaglijosephbenoit@gmail.com'
 const ITEMS_PER_PAGE = 50
 
-const PLANS = [
-  { value: 'starter', label: 'Starter', color: '#5a5e70' },
-  { value: 'pro', label: 'Pro', color: '#60a5fa' },
-  { value: 'premium', label: 'Premium', color: '#fbb03b' },
-] as const
-
-const DUREES = [
-  { label: '1 mois', months: 1 },
-  { label: '3 mois', months: 3 },
-  { label: '12 mois', months: 12 },
-] as const
-
 function formatPrix(p: number) {
   return new Intl.NumberFormat('fr-TG', { style: 'currency', currency: 'XOF', maximumFractionDigits: 0 }).format(p)
 }
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-function joursRestants(expiresAt: string | null): number | null {
-  if (!expiresAt) return null
-  const diff = new Date(expiresAt).getTime() - Date.now()
-  return Math.ceil(diff / (1000 * 60 * 60 * 24))
 }
 
 // 1. COMPOSANT DE TABLEAU RÉUTILISABLE (Mise à jour n°2)
@@ -67,15 +49,6 @@ export default function AdminPage() {
   // États pour la notification utilisateur (Mise à jour n°3)
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
-  // État pour l'édition inline d'un abonnement
-  const [editingSub, setEditingSub] = useState<string | null>(null)
-  const [subPlan, setSubPlan] = useState<'starter' | 'pro' | 'premium'>('pro')
-  const [subMonths, setSubMonths] = useState<number>(1)
-
-  // Mode monétisation global
-  const [monetizationEnabled, setMonetizationEnabled] = useState(false)
-  const [loadingToggle, setLoadingToggle] = useState(false)
-
   // Fonction utilitaire pour afficher un retour visuel à l'admin
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setStatusMessage({ text, type })
@@ -94,20 +67,18 @@ export default function AdminPage() {
       }
 
       // Ajout de .range(0, ITEMS_PER_PAGE - 1) pour éviter de saturer la mémoire si la base grandit
-      const [{ data: l, error: errL }, { data: p, error: errP }, { data: s, error: errS }] = await Promise.all([
+      const [{ data: l, error: errL }, { data: p, error: errP }] = await Promise.all([
         supabase.from('listings')
           .select('id, title, price, zone_saisie, property_type, transaction_type, images_urls, is_boosted, is_active, created_at, agent_id, whatsapp_clicks')
           .order('created_at', { ascending: false })
           .range(0, ITEMS_PER_PAGE - 1),
         supabase.from('profiles')
-          .select('id, full_name, phone_number, user_type, subscription_status, plan, plan_expires_at, created_at')
+          .select('id, full_name, phone_number, user_type, subscription_status, created_at')
           .order('created_at', { ascending: false })
-          .range(0, ITEMS_PER_PAGE - 1),
-        supabase.from('app_settings').select('monetization_enabled').eq('id', 1).single()
+          .range(0, ITEMS_PER_PAGE - 1)
       ])
 
       if (errL || errP) throw new Error("Erreur lors de la récupération des données.")
-      if (!errS && s) setMonetizationEnabled(s.monetization_enabled)
 
       setListings(l ?? [])
       setUsers(p ?? [])
@@ -188,71 +159,6 @@ export default function AdminPage() {
       showToast(`Utilisateur passé en mode ${next}`)
     } catch {
       showToast("Erreur de modification du type utilisateur", 'error')
-    }
-  }
-
-  // Active un abonnement : calcule la date d'expiration et met à jour Supabase.
-  // subscription_status se synchronise automatiquement via le trigger SQL.
-  const activateSubscription = async (id: string) => {
-    try {
-      const expiresAt = new Date()
-      expiresAt.setMonth(expiresAt.getMonth() + subMonths)
-
-      const { error } = await supabase
-        .from('profiles')
-        .update({ plan: subPlan, plan_expires_at: expiresAt.toISOString() })
-        .eq('id', id)
-      if (error) throw error
-
-      setUsers(prev => prev.map(u => u.id === id
-        ? { ...u, plan: subPlan, plan_expires_at: expiresAt.toISOString(), subscription_status: subPlan === 'starter' ? 'free' : 'premium' }
-        : u
-      ))
-      showToast(`Abonnement ${PLANS.find(p => p.value === subPlan)?.label} activé (${subMonths} mois)`)
-      setEditingSub(null)
-    } catch {
-      showToast("Erreur lors de l'activation de l'abonnement", 'error')
-    }
-  }
-
-  const cancelSubscription = async (id: string) => {
-    if (!confirm("Repasser cette agence en plan Starter (gratuit) ?")) return
-    try {
-      const { error } = await supabase.from('profiles').update({ plan: 'starter', plan_expires_at: null }).eq('id', id)
-      if (error) throw error
-      setUsers(prev => prev.map(u => u.id === id ? { ...u, plan: 'starter', plan_expires_at: null, subscription_status: 'free' } : u))
-      showToast("Abonnement repassé en Starter")
-    } catch {
-      showToast("Erreur lors de la rétrogradation", 'error')
-    }
-  }
-
-  // Bascule le mode monétisation global (visible/appliqué par tout le site)
-  const toggleMonetization = async () => {
-    const next = !monetizationEnabled
-    const message = next
-      ? "Activer le mode MONÉTISATION ? Les limites de plan (annonces max par abonnement) s'appliqueront sur tout le site."
-      : "Désactiver le mode monétisation et repasser en accès libre pour toutes les agences ?"
-    if (!confirm(message)) return
-
-    setLoadingToggle(true)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { error } = await supabase
-        .from('app_settings')
-        .update({
-          monetization_enabled: next,
-          monetization_activated_at: next ? new Date().toISOString() : null,
-          monetization_activated_by: next ? user?.id : null,
-        })
-        .eq('id', 1)
-      if (error) throw error
-      setMonetizationEnabled(next)
-      showToast(next ? "🚀 Mode monétisation ACTIVÉ" : "Mode monétisation désactivé")
-    } catch {
-      showToast("Erreur lors du changement de mode", 'error')
-    } finally {
-      setLoadingToggle(false)
     }
   }
 
@@ -352,32 +258,6 @@ export default function AdminPage() {
             )}
           </div>
 
-          {/* INTERRUPTEUR MODE MONÉTISATION */}
-          <button
-            onClick={toggleMonetization}
-            disabled={loadingToggle}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '6px 12px', borderRadius: '20px', cursor: loadingToggle ? 'wait' : 'pointer',
-              border: `1px solid ${monetizationEnabled ? 'rgba(34,197,94,0.35)' : 'rgba(255,255,255,0.08)'}`,
-              background: monetizationEnabled ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.04)',
-              fontFamily: 'inherit', opacity: loadingToggle ? 0.6 : 1,
-            }}
-          >
-            <span style={{
-              width: '28px', height: '16px', borderRadius: '10px', position: 'relative',
-              background: monetizationEnabled ? '#22c55e' : '#3a3e50', transition: 'background 0.2s',
-            }}>
-              <span style={{
-                position: 'absolute', top: '2px', left: monetizationEnabled ? '14px' : '2px',
-                width: '12px', height: '12px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
-              }} />
-            </span>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: monetizationEnabled ? '#22c55e' : '#5a5e70' }}>
-              {monetizationEnabled ? '💰 Monétisation ON' : 'Mode gratuit (beta)'}
-            </span>
-          </button>
-
           <span className="adm-badge">ADMIN</span>
           <button className="adm-logout" onClick={handleLogout}>Deconnexion</button>
         </div>
@@ -395,13 +275,6 @@ export default function AdminPage() {
             <button className={`adm-tab ${tab === 'stats' ? 'active' : ''}`} onClick={() => { setTab('stats'); setSearch('') }}>📊 Statistiques</button>
             <button className={`adm-tab ${tab === 'annonces' ? 'active' : ''}`} onClick={() => { setTab('annonces'); setSearch('') }}>🏠 Annonces <span className="adm-tab-count">{totalAnnonces}</span></button>
             <button className={`adm-tab ${tab === 'utilisateurs' ? 'active' : ''}`} onClick={() => { setTab('utilisateurs'); setSearch('') }}>👥 Utilisateurs <span className="adm-tab-count">{totalUsers}</span></button>
-            <Link 
-              href="/admin/analytics" 
-              className="adm-tab" 
-              style={{ textDecoration: 'none' }}
-            >
-              📈 Analytics
-            </Link>
           </div>
 
           {/* STATS */}
@@ -505,12 +378,8 @@ export default function AdminPage() {
                 <input className="adm-search" type="text" placeholder="Rechercher..." value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
 
-              <AdminTable headers={["Utilisateur", "Téléphone", "Type", "Plan", "Expire le", "Inscription", "Actions"]}>
-                {filteredUsers.map(u => {
-                  const jours = joursRestants(u.plan_expires_at)
-                  const planInfo = PLANS.find(p => p.value === u.plan) ?? PLANS[0]
-                  return (
-                  <Fragment key={u.id}>
+              <AdminTable headers={["Utilisateur", "Téléphone", "Type", "Abonnement", "Inscription", "Actions"]}>
+                {filteredUsers.map(u => (
                   <tr key={u.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -520,72 +389,15 @@ export default function AdminPage() {
                     </td>
                     <td style={{ color: '#5a5e70', fontSize: '12px', fontFamily: 'monospace' }}>{u.phone_number}</td>
                     <td><span className={`adm-pill ${u.user_type === 'agence' ? 'agence' : 'particulier'}`}>{u.user_type === 'agence' ? '🏢 Agence' : '👤 Particulier'}</span></td>
-                    <td>
-                      <span className="adm-pill" style={{ background: `${planInfo.color}22`, color: planInfo.color }}>
-                        {planInfo.label}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: '11px', fontFamily: 'monospace' }}>
-                      {u.plan_expires_at ? (
-                        <span style={{ color: jours !== null && jours <= 3 ? '#ef4444' : '#5a5e70' }}>
-                          {formatDate(u.plan_expires_at)}
-                          {jours !== null && jours <= 3 && jours >= 0 && ' ⚠️'}
-                        </span>
-                      ) : '—'}
-                    </td>
+                    <td><span className={`adm-pill ${u.subscription_status === 'premium' ? 'boosted' : 'inactive'}`}>{u.subscription_status === 'premium' ? 'Premium' : 'Gratuit'}</span></td>
                     <td style={{ color: '#5a5e70', fontSize: '11px', fontFamily: 'monospace' }}>{formatDate(u.created_at)}</td>
                     <td>
                       <div className="adm-actions">
                         <button className="adm-btn purple" onClick={() => toggleUserType(u.id, u.user_type)}>{u.user_type === 'agence' ? 'Passer Particulier' : 'Passer Agence'}</button>
-                        {u.user_type === 'agence' && (
-                          <>
-                            <button className="adm-btn gold" onClick={() => { setEditingSub(editingSub === u.id ? null : u.id); setSubPlan('pro'); setSubMonths(1) }}>
-                              {editingSub === u.id ? 'Fermer' : 'Gérer abonnement'}
-                            </button>
-                            {u.plan && u.plan !== 'starter' && (
-                              <button className="adm-btn red" onClick={() => cancelSubscription(u.id)}>Repasser Starter</button>
-                            )}
-                          </>
-                        )}
                       </div>
                     </td>
                   </tr>
-                  {editingSub === u.id && (
-                    <tr>
-                      <td colSpan={7} style={{ background: 'rgba(255,255,255,0.02)', padding: '14px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '11px', color: '#5a5e70', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Plan :</span>
-                          {PLANS.map(p => (
-                            <button
-                              key={p.value}
-                              className="adm-btn"
-                              style={subPlan === p.value ? { color: p.color, borderColor: `${p.color}55`, background: `${p.color}15` } : {}}
-                              onClick={() => setSubPlan(p.value)}
-                            >
-                              {p.label}
-                            </button>
-                          ))}
-                          <span style={{ fontSize: '11px', color: '#5a5e70', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginLeft: '10px' }}>Durée :</span>
-                          {DUREES.map(d => (
-                            <button
-                              key={d.months}
-                              className="adm-btn"
-                              style={subMonths === d.months ? { color: '#fbb03b', borderColor: 'rgba(251,176,59,0.35)', background: 'rgba(251,176,59,0.08)' } : {}}
-                              onClick={() => setSubMonths(d.months)}
-                            >
-                              {d.label}
-                            </button>
-                          ))}
-                          <button className="adm-btn green" style={{ marginLeft: '10px', fontWeight: 700 }} onClick={() => activateSubscription(u.id)}>
-                            ✅ Activer
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                  </Fragment>
-                  )
-                })}
+                ))}
               </AdminTable>
             </>
           )}
