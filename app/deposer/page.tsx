@@ -146,7 +146,6 @@ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
             images_urls: uploadedUrls,
             is_boosted: false,
             is_active: true,
-            status: 'pending'
           }
         ])
 

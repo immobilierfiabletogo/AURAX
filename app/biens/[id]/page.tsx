@@ -121,7 +121,7 @@ export default function BienDetailPage() {
   }
 
   // Numéro par défaut : priorité à l'agent, sinon le listing, sinon le fixe AURAX
-  const telephoneContact = agence?.phone_number || listing.contact_phone || '+22890000000' 
+  const telephoneContact = listing.contact_phone || agence?.phone_number || '+22879963708'
   const messageWhatsapp = encodeURIComponent(`Bonjour, je suis très intéressé par votre annonce "${listing.title}" sur AURAX (${formatPrix(listing.price)} à ${listing.zone_saisie}). Est-elle toujours disponible ?`)
   return (
     <div className="min-h-screen bg-slate-50/60 text-slate-900 antialiased">
