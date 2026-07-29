@@ -1,18 +1,22 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import Link from "next/link"; 
-import "./globals.css";
-import Navbar from "@/components/Navbar";
+import Link from "next/link";
 
-const inter = Inter({ 
+import "./globals.css";
+
+import Navbar from "@/components/Navbar";
+import { FavoritesProvider } from "@/contexts/FavoritesContext";
+
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-geist-sans", 
+  variable: "--font-geist-sans",
 });
 
 export const metadata: Metadata = {
   title: "AURAX | Immobilier à Lomé",
-  description: "Trouvez votre bien immobilier à Lomé, Togo. Appartements, maisons, villas et terrains disponibles sur AURAX.",
-  metadataBase: new URL('https://au-rax.com'),
+  description:
+    "Trouvez votre bien immobilier à Lomé, Togo. Appartements, maisons, villas et terrains disponibles sur AURAX.",
+  metadataBase: new URL("https://au-rax.com"),
   openGraph: {
     title: "AURAX | Immobilier à Lomé",
     description: "La plateforme immobilière du Togo. Simple, rapide et vérifié.",
@@ -24,7 +28,7 @@ export const metadata: Metadata = {
         width: 1200,
         height: 630,
         alt: "AURAX — La plateforme immobilière du Togo",
-      }
+      },
     ],
     locale: "fr_TG",
     type: "website",
@@ -35,30 +39,42 @@ export const metadata: Metadata = {
     description: "La plateforme immobilière du Togo.",
     images: ["/og-image.jpg"],
   },
-}
+};
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <html lang="fr" className={inter.variable}>
       <body className="font-sans antialiased bg-slate-50 text-slate-900">
-        <Navbar />
-        
-        <main>{children}</main>
+        <FavoritesProvider>
+          <Navbar />
 
-        {/* 2. Intégration du footer */}
-        <footer className="border-t border-slate-100 py-6 text-center text-xs text-slate-400">
-          <Link href="/confidentialite" className="hover:text-slate-700 mx-2">
-            Politique de confidentialité
-          </Link>
-          ·
-          <Link href="/cgu" className="hover:text-slate-700 mx-2">
-            Conditions d'utilisation
-          </Link>
-        </footer>
+          <main>
+            {children}
+          </main>
+
+          <footer className="border-t border-slate-100 py-6 text-center text-xs text-slate-400">
+            <Link
+              href="/confidentialite"
+              className="mx-2 hover:text-slate-700 transition-colors"
+            >
+              Politique de confidentialité
+            </Link>
+
+            <span className="mx-1">·</span>
+
+            <Link
+              href="/cgu"
+              className="mx-2 hover:text-slate-700 transition-colors"
+            >
+              Conditions d'utilisation
+            </Link>
+          </footer>
+        </FavoritesProvider>
       </body>
     </html>
-  )}
+  );
+}

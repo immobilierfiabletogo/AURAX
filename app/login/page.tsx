@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { createClient } from '@/utils/supabase'
+import { createClient } from "@/lib/supabase/client";
 import Link from 'next/link'
 
 function LoginContent() {
@@ -40,7 +40,7 @@ function LoginContent() {
       if (profile?.user_type === 'agence') {
         router.push('/dashboard-agence')
       } else {
-        router.push('/mon-espace')
+        router.push('/dashboard-agence')
       }
     }
     router.refresh()

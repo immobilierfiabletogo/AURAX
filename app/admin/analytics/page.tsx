@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/utils/supabase'
+import { createClient } from "@/lib/supabase/client";
 import { Users, Home, Eye, MessageSquare, TrendingUp, Building2 } from 'lucide-react'
 
 // Constante alignée sur ton fichier admin principal
@@ -60,9 +60,23 @@ export default function AnalyticsPage() {
         supabase.from('listings').select('id, title, zone_saisie, views, whatsapp_clicks, images_urls').eq('status', 'approved').order('views', { ascending: false }).limit(5),
       ])
 
-      const totalVues = vuesData?.reduce((acc, l) => acc + (l.views ?? 0), 0) ?? 0
-      const totalClicsWhatsapp = vuesData?.reduce((acc, l) => acc + (l.whatsapp_clicks ?? 0), 0) ?? 0
+      const totalVues =
+        vuesData?.reduce(
+          (
+            acc: number,
+            l: { views: number | null; whatsapp_clicks: number | null }
+          ) => acc + (l.views ?? 0),
+          0
+        ) ?? 0
 
+      const totalClicsWhatsapp =
+        vuesData?.reduce(
+          (
+            acc: number,
+            l: { views: number | null; whatsapp_clicks: number | null }
+          ) => acc + (l.whatsapp_clicks ?? 0),
+          0
+        ) ?? 0
       setStats({
         totalListings: totalListings ?? 0,
         approvedListings: approvedListings ?? 0,

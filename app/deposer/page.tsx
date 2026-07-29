@@ -2,12 +2,15 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/utils/supabase'
+import { createClient } from "@/lib/supabase/client";
 import Link from 'next/link'
 import { 
   Building2, MapPin, Coins, FileText, Phone, UploadCloud, 
   CheckCircle2, ArrowRight, Sparkles, Loader2, Info, X, Image as ImageIcon
 } from 'lucide-react'
+import { createListingAction } from "./actions";
+
+import RichTextEditor from '@/components/editor/RichTextEditor'
 
 export default function DeposerPage() {
   const router = useRouter()
@@ -31,6 +34,27 @@ export default function DeposerPage() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+
+  const handlePriceChange = (
+  e: React.ChangeEvent<HTMLInputElement>
+) => {
+  const digits = e.target.value.replace(/\D/g, '')
+  setPrice(digits)
+}
+
+  const handlePhoneChange = (
+  e: React.ChangeEvent<HTMLInputElement>
+) => {
+  let value = e.target.value
+
+  // Garde uniquement les chiffres
+  value = value.replace(/\D/g, '')
+
+  // Limite à 15 chiffres
+  value = value.slice(0, 15)
+
+  setContactPhone(value)
+}
 
   // Gérer la sélection des fichiers et générer les prévisualisations
   const compressImage = (file: File): Promise<File> => {
@@ -130,27 +154,21 @@ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         uploadedUrls.push(publicUrl)
       }
 
-      // 2. INSERTION
-      const { error: insertError } = await supabase
-        .from('listings')
-        .insert([
-          {
-            agent_id: user.id, // Utilisateur maintenant défini
-            title,
-            description,
-            price: Number(price),
-            zone_saisie: zone,
-            property_type: propertyType,
-            transaction_type: transactionType,
-            contact_phone: contactPhone, // J'ai décommenté cette ligne
-            images_urls: uploadedUrls,
-            is_boosted: false,
-            is_active: true,
-          }
-        ])
+      const result = await createListingAction({
+        agent_id: user.id,
+        title,
+        description,
+        price: Number(price),
+        zone_saisie: zone,
+        property_type: propertyType,
+        transaction_type: transactionType,
+        contact_phone: contactPhone,
+        images_urls: uploadedUrls,
+      });
 
-      if (insertError) throw new Error(insertError.message)
-
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
       setPreviews([])
       setSelectedFiles([])
       setSuccess(true)
@@ -185,6 +203,14 @@ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
       </div>
     )
   }
+
+  const formIsValid =
+      title.trim() !== '' &&
+      description.trim() !== '' &&
+      price.trim() !== '' &&
+      zone.trim() !== '' &&
+      contactPhone.trim() !== '' &&
+      selectedFiles.length > 0
 
   return (
     <div className="min-h-screen bg-slate-50/60 text-slate-900 antialiased py-12 px-6">
@@ -253,7 +279,10 @@ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700">Description</label>
-                <textarea rows={3} placeholder="Détaillez l'offre (compteur d'électricité, eau de forage, accès, etc.)" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500 focus:bg-white transition-all font-medium text-slate-800 resize-none" value={description} onChange={(e) => setDescription(e.target.value)} />
+               <RichTextEditor
+                 value={description}
+                 onChange={setDescription}
+               />
               </div>
             </div>
           </div>
@@ -265,13 +294,53 @@ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700">Prix demandé (FCFA) <span className="text-rose-500">*</span></label>
+                <label className="text-xs font-bold text-slate-700">
+                  Prix demandé (FCFA)
+                  <span className="text-rose-500">*</span>
+                </label>
+
                 <div className="relative">
                   <Coins className="absolute left-3.5 inset-y-0 h-full w-4 text-slate-400 pointer-events-none" />
-                  <input type="number" required placeholder="Ex: 120000" className="w-full pl-10 pr-16 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500 focus:bg-white transition-all font-black text-slate-900" value={price} onChange={(e) => setPrice(e.target.value)} />
-                  <span className="absolute right-3.5 inset-y-0 flex items-center text-xs font-bold text-slate-400 pointer-events-none">XOF</span>
-                </div>
-              </div>
+
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    required
+                    placeholder="Ex : 12 500 000"
+                    className="
+                    w-full
+                    pl-10
+                    pr-16
+                    py-2.5
+                    bg-slate-50
+                    border
+                    border-slate-200
+                    rounded-xl
+                    text-sm
+                    font-black
+                    text-slate-900
+                    focus:outline-none
+                    focus:border-emerald-500
+                    focus:bg-white
+                    transition-all
+                  "
+                  value={
+                   price
+                     ? Number(price).toLocaleString('fr-FR')
+                     : ''
+                  }
+                  onChange={handlePriceChange}
+               />
+
+                <span className="absolute right-3.5 inset-y-0 flex items-center text-xs font-bold text-slate-400 pointer-events-none">
+                 FCFA
+                </span>
+             </div>
+
+             <p className="text-xs text-slate-400">
+               Seuls les chiffres sont autorisés.
+             </p>
+            </div>
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700">Quartier (Lomé) <span className="text-rose-500">*</span></label>
                 <div className="relative">
@@ -334,24 +403,121 @@ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                 <label className="text-xs font-bold text-slate-700">Numéro WhatsApp / Appel <span className="text-rose-500">*</span></label>
                 <div className="relative">
                   <Phone className="absolute left-3.5 inset-y-0 h-full w-4 text-slate-400 pointer-events-none" />
-                  <input type="tel" required placeholder="Ex: +228 90 12 34 56" className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    required
+                    placeholder="Ex : 90123456"
+                    className="
+                    w-full
+                    pl-10
+                    pr-4
+                    py-2.5
+                    bg-slate-50
+                    border
+                    border-slate-200
+                    rounded-xl
+                    text-sm
+                    font-semibold
+                    text-slate-800
+                    focus:outline-none
+                    focus:border-emerald-500
+                    focus:bg-white
+                    transition-all
+                  "
+                  value={contactPhone}
+                  onChange={handlePhoneChange}
+                />
+
+                <p className="text-xs text-slate-400">
+                   Seuls les chiffres sont autorisés.
+                </p>
                 </div>
               </div>
             </div>
           </div>
 
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+
+            <div className="flex items-center justify-between text-sm">
+
+              <span className="font-semibold text-slate-600">
+                Photos sélectionnées
+              </span>
+
+              <span
+                className={`font-black ${
+                 selectedFiles.length > 0
+                   ? 'text-emerald-600'
+                   : 'text-rose-500'
+                }`}
+              >
+                {selectedFiles.length}
+              </span>
+
+            </div>
+
+          <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+
+        <div
+          className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+          style={{
+            width: `${Math.min(
+              (selectedFiles.length / 8) * 100,
+              100
+            )}%`,
+          }}
+        />
+
+      </div>
+
+      <p className="text-xs text-slate-500">
+        Ajoutez plusieurs photos pour rendre votre annonce plus attractive.
+      </p>
+
+    </div>
+
           {/* BUTTON SUBMIT */}
           <div className="pt-6 border-t border-slate-100 flex items-center justify-end">
-            <button type="submit" disabled={loading} className="w-full sm:w-auto px-8 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md">
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  Envoi des images et de l'annonce...
-                </>
-              ) : (
-                <>Publier mon annonce gratuitement <ArrowRight className="w-4 h-4 text-white" /></>
-              )}
-            </button>
+            <button
+              type="submit"
+              disabled={loading || !formIsValid}
+              className="
+              w-full
+              sm:w-auto
+              px-8
+              py-3.5
+              rounded-xl
+              font-bold
+              text-sm
+              flex
+              items-center
+              justify-center
+              gap-2
+              transition-all
+              shadow-md
+
+              disabled:bg-slate-300
+              disabled:text-white
+              disabled:cursor-not-allowed
+
+              enabled:bg-slate-900
+              enabled:hover:bg-emerald-600
+              enabled:text-white
+            "
+          >
+            {loading ? (
+             <>
+               <Loader2 className="h-4 w-4 animate-spin" />
+               Publication...
+             </>
+           ) : (
+             <>
+               Publier mon annonce
+               <ArrowRight className="h-4 w-4" />
+             </>
+           )}
+         </button>
           </div>
 
         </form>

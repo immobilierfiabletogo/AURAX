@@ -3,11 +3,10 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { createClient } from '@/utils/supabase'
-import { 
-  Menu, X, Home, Building2, PlusCircle, 
-  User, LogOut, LayoutDashboard, ChevronDown 
-} from 'lucide-react'
+import { createClient } from "@/lib/supabase/client";
+import {  Menu, X, Home, Building2, PlusCircle, User, LogOut, LayoutDashboard, ChevronDown } from 'lucide-react'
+import type { Session } from "@supabase/supabase-js";
+import type { AuthChangeEvent } from "@supabase/supabase-js";
 
 export default function Navbar() {
   const [user, setUser] = useState<any>(null)
@@ -36,7 +35,7 @@ export default function Navbar() {
     }
     getUserData()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       if (session?.user) {
         setUser(session.user)
       } else {
@@ -62,9 +61,8 @@ export default function Navbar() {
   }
 
   const navLinks = [
-    { href: '/', label: 'Accueil', icon: Home, exact: true },
-    { href: '/biens', label: 'Catalogue', icon: Building2, exact: false },
-    { href: '/deposer', label: 'Déposer une annonce', icon: PlusCircle, exact: true },
+    { href: '/biens', icon: Building2, exact: false },
+    { href: '/deposer', icon: PlusCircle, exact: true },
   ]
 
   const isLinkActive = (href: string, exact: boolean) => {
@@ -112,7 +110,7 @@ export default function Navbar() {
                     : 'text-slate-600 hover:text-slate-950'
                 }`}
               >
-                {link.label}
+                
               </Link>
             )
           })}
@@ -188,31 +186,42 @@ export default function Navbar() {
       </div>
 
       {mobileNavOpen && (
-        <div className="md:hidden border-t border-slate-100 bg-white px-4 pt-2 pb-4 space-y-1 shadow-lg shadow-slate-100/60">
-          {navLinks.map((link) => {
-            const Icon = link.icon
-            const active = isLinkActive(link.href, link.exact)
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileNavOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
-                  active ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'
-                }`}
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                {link.label}
-              </Link>
-            )
-          })}
-          {!user && (
-            <div className="pt-4 mt-2 border-t border-slate-100 flex flex-col gap-2">
-              <Link href="/login" onClick={() => setMobileNavOpen(false)} className="w-full py-2.5 text-center text-sm font-bold text-slate-700 bg-slate-50 rounded-xl">Connexion</Link>
-              <Link href="/register" onClick={() => setMobileNavOpen(false)} className="w-full py-2.5 text-center text-sm font-extrabold text-slate-950 bg-emerald-600 text-white rounded-xl shadow-xs">S'inscrire</Link>
+        <div className="md:hidden border-t border-slate-100 bg-white px-4 pt-4 pb-6 shadow-lg shadow-slate-100/60">
+          {!user ? (
+            <div className="flex flex-col gap-3">
+             <Link
+               href="/login"
+               onClick={() => setMobileNavOpen(false)}
+               className="w-full py-3 text-center text-sm font-bold text-slate-700 bg-slate-50 rounded-xl"
+             >
+               Se connecter
+             </Link>
+             <Link
+               href="/register"
+               onClick={() => setMobileNavOpen(false)}
+               className="w-full py-3 text-center text-sm font-extrabold text-white bg-emerald-600 rounded-xl"
+             >
+               S'inscrire
+             </Link>
             </div>
-          )}
-        </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <Link
+                href={userType === 'agence' ? '/dashboard-agence' : '/mon-espace'}
+                onClick={() => setMobileNavOpen(false)}
+                className="w-full py-3 text-center text-sm font-bold text-slate-700 bg-slate-50 rounded-xl"
+              >
+                Mon espace
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="w-full py-3 text-center text-sm font-bold text-rose-600 bg-rose-50 rounded-xl cursor-pointer"
+              >
+                Déconnexion
+              </button>
+           </div>
+         )}
+       </div>
       )}
     </nav>
   )

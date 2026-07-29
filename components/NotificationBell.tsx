@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '../utils/supabase' 
 import { Bell } from 'lucide-react'
 
+import type { RealtimePostgresInsertPayload } from "@supabase/supabase-js";
+
 interface Notification {
   id: string
   message: string
@@ -48,7 +50,7 @@ export default function NotificationBell({ agencyId }: { agencyId: string }) {
         schema: 'public',
         table: 'notifications',
         filter: `agency_id=eq.${agencyId}`
-      }, (payload) => {
+      }, (payload: RealtimePostgresInsertPayload<Notification>) => {
         setNotifs(prev => [payload.new as Notification, ...prev])
       })
       .subscribe()

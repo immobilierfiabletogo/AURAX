@@ -1,33 +1,34 @@
-// middleware.ts
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextRequest } from "next/server";
+import { updateSession } from "@/lib/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
-  const response = NextResponse.next()
+  const response = await updateSession(request);
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: {
-      get(name) { return request.cookies.get(name)?.value },
-      set(name, value, options) { response.cookies.set({ name, value, ...options }) },
-      remove(name, options) { response.cookies.set({ name, value: '', ...options }) },
-    }}
-  )
+  const pathname = request.nextUrl.pathname;
 
-  const { data: { session } } = await supabase.auth.getSession()
+  const protectedRoutes = [
+    "/dashboard-agence",
+    "/mon-espace",
+    "/deposer-annonce",
+    "/admin",
+  ];
 
-  const protectedRoutes = ['/dashboard-agence', '/mon-espace', '/admin', '/deposer', '/deposer-annonce']
-  const isProtected = protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route))
+  const isProtected = protectedRoutes.some((route) =>
+    pathname.startsWith(route)
+  );
 
-  if (isProtected && !session) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  if (!isProtected) {
+    return response;
   }
 
-  return response
+  return response;
 }
 
 export const config = {
-  matcher: ['/dashboard-agence/:path*', '/mon-espace/:path*', '/admin/:path*', '/deposer/:path*', '/deposer-annonce/:path*']
-}
+  matcher: [
+    "/dashboard-agence/:path*",
+    "/mon-espace/:path*",
+    "/deposer-annonce/:path*",
+    "/admin/:path*",
+  ],
+};

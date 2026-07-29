@@ -1,40 +1,50 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/utils/supabase'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { createClient } from "@/lib/supabase/client";
 import Link from 'next/link'
+import { Eye, EyeOff, Building2, User, ChevronRight, Loader2 } from 'lucide-react'
 
-export default function RegisterPage() {
+function RegisterContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
-  
-  // 1. Déclaration de tous les états
+
+  const typeParam = searchParams.get('type')
+  const [step, setStep] = useState<'type' | 'form'>(typeParam ? 'form' : 'type')
+  const [userType, setUserType] = useState<'agence' | 'particulier'>(
+    typeParam === 'agence' ? 'agence' : typeParam === 'particulier' ? 'particulier' : 'agence'
+  )
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [userType, setUserType] = useState<'particulier' | 'agence'>('particulier')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [acceptCGU, setAcceptCGU] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const [acceptCGU, setAcceptCGU] = useState(false)
+  const handleSelectType = (type: 'agence' | 'particulier') => {
+    setUserType(type)
+    setStep('form')
+  }
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!acceptCGU) { setError("Veuillez accepter les conditions d'utilisation."); return }
+    if (password !== confirmPassword) { setError("Les mots de passe ne correspondent pas."); return }
+    if (password.length < 8) { setError("Le mot de passe doit contenir au moins 8 caractères."); return }
+
     setLoading(true)
     setError(null)
 
-    try {
-      // 2. Création de l'utilisateur dans l'Auth Supabase
-     const { data, error: signUpError } = await supabase.auth.signUp({
-       email,
-       password,
-       options: {
-       data: {
-         full_name: fullName,
-         phone_number: phone,
-         user_type: userType,
-       }
+    const { error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName, phone_number: phone, user_type: userType }
       }
     })
 
@@ -44,115 +54,247 @@ export default function RegisterPage() {
       return
     }
 
-    // Le profil est créé automatiquement par le trigger Supabase
-    // On affiche un message de confirmation email au lieu de rediriger
-    setError(null)
-    setLoading(false)
-    // On redirige vers une page de confirmation
     router.push('/confirmation-email')
+  }
 
-    } catch (err) {
-      console.error("Erreur critique inattendue:", err)
-      setError("Une erreur critique est survenue lors de l'inscription.")
-      setLoading(false)
+  const profiles = {
+    agence: {
+      icon: Building2,
+      title: 'Agence / Promoteur',
+      desc: 'Vous êtes une agence immobilière, un promoteur ou un professionnel de l\'immobilier.',
+      perks: ['Tableau de bord professionnel', 'Annonces illimitées', 'Statistiques détaillées', 'Contacts directs avec les prospects'],
+      color: '#2ECC71',
+      bg: 'rgba(46,204,113,0.06)',
+      border: 'rgba(46,204,113,0.2)',
+    },
+    particulier: {
+      icon: User,
+      title: 'Propriétaire',
+      desc: 'Vous avez un bien à louer ou à vendre et souhaitez le publier directement.',
+      perks: ['Publication gratuite', '1 annonce en ligne', 'Contact direct avec les acheteurs', 'Suivi des visites'],
+      color: '#3B82F6',
+      bg: 'rgba(59,130,246,0.06)',
+      border: 'rgba(59,130,246,0.2)',
     }
   }
 
-  return (
-    <>
-      <style>{`
-        .auth { min-height: calc(100vh - 60px); background: #f7f7f5; display: flex; align-items: center; justify-content: center; padding: 24px; }
-        .auth-card { background: #fff; border: 1px solid rgba(26,28,34,0.08); border-radius: 20px; padding: 40px; width: 100%; max-width: 420px; box-shadow: 0 8px 32px rgba(26,28,34,0.06); }
-        .auth-logo { font-size: 22px; font-weight: 800; letter-spacing: -1px; color: #1a1c22; text-align: center; margin-bottom: 6px; }
-        .auth-logo span { color: #fbb03b; }
-        .auth-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: #1a1c22; text-align: center; margin-bottom: 4px; }
-        .auth-sub { font-size: 13px; color: #8a8e9a; text-align: center; margin-bottom: 24px; }
-        .auth-error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 12px 14px; border-radius: 10px; font-size: 13px; margin-bottom: 16px; word-break: break-word; }
-        .auth-label { display: block; font-size: 13px; font-weight: 600; color: #1a1c22; margin-bottom: 6px; }
-        .auth-input { width: 100%; padding: 12px 14px; border: 1px solid #e8e8e4; border-radius: 10px; font-size: 14px; font-family: inherit; color: #1a1c22; outline: none; transition: all 0.15s; box-sizing: border-box; }
-        .auth-input:focus { border-color: #fbb03b; box-shadow: 0 0 0 3px rgba(251,176,59,0.1); }
-        .auth-field { margin-bottom: 16px; }
-        .auth-toggle-group { display: flex; gap: 10px; margin-bottom: 20px; }
-        .auth-toggle-btn { flex: 1; padding: 10px; border: 1px solid #e8e8e4; background: #fff; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
-        .auth-toggle-btn.active { background: #1a1c22; color: #fff; border-color: #1a1c22; }
-        .auth-btn { width: 100%; padding: 14px; background: #1a1c22; color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.15s; margin-top: 8px; }
-        .auth-btn:hover { background: #2a2d38; }
-        .auth-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .auth-footer { text-align: center; margin-top: 20px; font-size: 13px; color: #8a8e9a; }
-        .auth-footer a { color: #fbb03b; font-weight: 600; text-decoration: none; }
-        .auth-footer a:hover { text-decoration: underline; }
-      `}</style>
+  if (step === 'type') {
+    return (
+      <div className="min-h-screen bg-[#f7f7f5] flex flex-col items-center justify-center px-4 py-12">
+        <div className="w-full max-w-2xl">
 
-      <div className="auth">
-        <div className="auth-card">
-          <div className="auth-logo">AU<span>RAX</span></div>
-          <h1 className="auth-title">Créer un compte</h1>
-          <p className="auth-sub font-medium">Rejoignez la plateforme immobilière</p>
+          {/* Logo */}
+          <div className="text-center mb-10">
+            <Link href="/" className="inline-flex items-center gap-2 mb-6">
+              <span className="text-2xl font-black tracking-tight">
+                AU<span className="text-emerald-500">RAX</span>
+              </span>
+            </Link>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+              Créer un compte
+            </h1>
+            <p className="text-sm text-slate-500 mt-2">
+              Choisissez votre profil pour commencer
+            </p>
+          </div>
 
-          <form onSubmit={handleRegister}>
-            {error && <div className="auth-error">{error}</div>}
-
-            <div className="auth-field">
-              <label className="auth-label">Je suis un</label>
-              <div className="auth-toggle-group">
-                <button type="button" className={`auth-toggle-btn ${userType === 'particulier' ? 'active' : ''}`} onClick={() => setUserType('particulier')}>
-                  👤 Particulier
+          {/* Cards de sélection */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            {(Object.entries(profiles) as [keyof typeof profiles, typeof profiles['agence']][]).map(([key, profile]) => {
+              const Icon = profile.icon
+              return (
+                <button
+                  key={key}
+                  onClick={() => handleSelectType(key)}
+                  className="group text-left p-6 rounded-2xl border-2 bg-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg cursor-pointer"
+                  style={{ borderColor: profile.border }}
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: profile.bg }}>
+                      <Icon className="w-6 h-6" style={{ color: profile.color }} />
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-slate-500 transition-colors mt-1" />
+                  </div>
+                  <h3 className="text-base font-black text-slate-900 mb-1">{profile.title}</h3>
+                  <p className="text-xs text-slate-500 leading-relaxed mb-4">{profile.desc}</p>
+                  <ul className="space-y-1.5">
+                    {profile.perks.map((perk, i) => (
+                      <li key={i} className="flex items-center gap-2 text-xs text-slate-600">
+                        <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white shrink-0" style={{ background: profile.color }}>✓</span>
+                        {perk}
+                      </li>
+                    ))}
+                  </ul>
                 </button>
-                <button type="button" className={`auth-toggle-btn ${userType === 'agence' ? 'active' : ''}`} onClick={() => setUserType('agence')}>
-                  🏢 Agence
+              )
+            })}
+          </div>
+
+          <p className="text-center text-xs text-slate-400">
+            Déjà un compte ?{' '}
+            <Link href="/login" className="font-bold text-emerald-600 hover:text-emerald-700">
+              Se connecter
+            </Link>
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  const profile = profiles[userType]
+  const Icon = profile.icon
+
+  return (
+    <div className="min-h-screen bg-[#f7f7f5] flex flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md">
+
+        {/* Header */}
+        <div className="text-center mb-8">
+          <Link href="/" className="inline-flex items-center gap-2 mb-6">
+            <span className="text-2xl font-black tracking-tight">
+              AU<span className="text-emerald-500">RAX</span>
+            </span>
+          </Link>
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: profile.bg }}>
+              <Icon className="w-4 h-4" style={{ color: profile.color }} />
+            </div>
+            <span className="text-sm font-bold" style={{ color: profile.color }}>{profile.title}</span>
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Créer votre compte</h1>
+          <button
+            onClick={() => setStep('type')}
+            className="text-xs text-slate-400 hover:text-slate-600 mt-1 cursor-pointer"
+          >
+            ← Changer de profil
+          </button>
+        </div>
+
+        {/* Formulaire */}
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 sm:p-8">
+          {error && (
+            <div className="mb-5 p-3.5 bg-rose-50 border border-rose-100 rounded-xl text-xs font-semibold text-rose-700">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleRegister} className="space-y-4">
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 mb-1.5 block">
+                {userType === 'agence' ? "Nom de l'agence *" : 'Nom complet *'}
+              </label>
+              <input
+                type="text" required
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+                placeholder={userType === 'agence' ? 'Ex: Immo Lomé' : 'Ex: Kofi Mensah'}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 mb-1.5 block">Numéro WhatsApp *</label>
+              <input
+                type="tel" required
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                placeholder="+228 90 00 00 00"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 mb-1.5 block">Adresse e-mail *</label>
+              <input
+                type="email" required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="exemple@email.com"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 mb-1.5 block">Mot de passe *</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'} required
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Minimum 8 caractères"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all pr-11"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
 
-            <div className="auth-field">
-              <label className="auth-label">{userType === 'agence' ? "Nom de l'agence" : 'Nom complet'}</label>
-              <input className="auth-input" type="text" required placeholder={userType === 'agence' ? 'Ex: Immo Lomé' : 'Ex: Kofi Mensah'} value={fullName} onChange={(e) => setFullName(e.target.value)} />
+            <div>
+              <label className="text-xs font-bold text-slate-700 mb-1.5 block">Confirmer le mot de passe *</label>
+              <input
+                type={showPassword ? 'text' : 'password'} required
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                placeholder="Répétez votre mot de passe"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all"
+              />
             </div>
 
-            <div className="auth-field">
-              <label className="auth-label">Numéro WhatsApp</label>
-              <input className="auth-input" type="tel" required placeholder="Ex: +22890123456" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <div className="flex items-start gap-3 pt-1">
+              <input
+                type="checkbox" required
+                checked={acceptCGU}
+                onChange={e => setAcceptCGU(e.target.checked)}
+                className="mt-0.5 cursor-pointer"
+              />
+              <label className="text-xs text-slate-500 leading-relaxed">
+                J'accepte les{' '}
+                <Link href="/cgu" target="_blank" className="font-bold text-emerald-600 hover:underline">
+                  Conditions d'utilisation
+                </Link>{' '}
+                et la{' '}
+                <Link href="/confidentialite" target="_blank" className="font-bold text-emerald-600 hover:underline">
+                  Politique de confidentialité
+                </Link>
+              </label>
             </div>
 
-            <div className="auth-field">
-              <label className="auth-label">Adresse e-mail</label>
-              <input className="auth-input" type="email" required placeholder="exemple@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
-
-            <div className="auth-field">
-              <label className="auth-label">Mot de passe</label>
-              <input className="auth-input" type="password" required placeholder="8 caractères minimum" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
-            </div>
-
-              <div className="auth-field" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                <input
-                  type="checkbox"
-                  required
-                  checked={acceptCGU}
-                  onChange={(e) => setAcceptCGU(e.target.checked)}
-                  style={{ marginTop: '3px' }}
-                />
-                <label style={{ fontSize: '12px', color: '#5a5e70', lineHeight: '1.5' }}>
-                  J'accepte les{' '}
-                  <Link href="/cgu" target="_blank" style={{ color: '#fbb03b', fontWeight: 600 }}>
-                    Conditions Générales d'Utilisation
-                  </Link>{' '}
-                  et la{' '}
-                  <Link href="/confidentialite" target="_blank" style={{ color: '#fbb03b', fontWeight: 600 }}>
-                    Politique de confidentialité
-                  </Link>
-                </label>
-              </div>    
-            <button type="submit" className="auth-btn" disabled={loading || !acceptCGU}>
-              {loading ? 'Création du compte...' : 'Créer mon compte gratuitement'}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3.5 text-white font-black text-sm rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-60 mt-2"
+              style={{ background: loading ? '#94a3b8' : profile.color }}
+            >
+              {loading ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Création en cours...</>
+              ) : (
+                'Créer mon compte'
+              )}
             </button>
           </form>
 
-          <div className="auth-footer">
-            Déjà un compte ? <Link href="/login">Se connecter</Link>
-          </div>
+          <p className="text-center text-xs text-slate-400 mt-5">
+            Déjà un compte ?{' '}
+            <Link href="/login" className="font-bold text-emerald-600 hover:text-emerald-700">
+              Se connecter
+            </Link>
+          </p>
         </div>
       </div>
-    </>
+    </div>
+  )
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterContent />
+    </Suspense>
   )
 }

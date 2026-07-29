@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/utils/supabase'
+import { createClient } from "@/lib/supabase/client";
 import { CheckCircle2, XCircle, MapPin } from 'lucide-react'
 
 export default function ModerationPage() {
