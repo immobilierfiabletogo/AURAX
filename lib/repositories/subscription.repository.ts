@@ -32,7 +32,7 @@ export class SubscriptionRepository {
 
   static async updatePlan(
     userId: string,
-    plan: "free" | "pro" | "premium",
+    plan: "free" | "starter" | "pro" | "premium",
     expiresAt: string | null
   ) {
     const supabase = await createClient();

@@ -14,33 +14,45 @@ export function buildAgencyMetadata({
 
   const description =
     agency.description?.trim() ||
-    `${agency.full_name} propose ${listingsCount} bien${
+    `Découvrez les biens immobiliers proposés par ${agency.full_name} sur AURAX. ${listingsCount} annonce${
       listingsCount > 1 ? 's' : ''
-    } immobilier${
+    } actuellement disponible${
       listingsCount > 1 ? 's' : ''
-    } sur AURAX.`
+    }.`
 
   const image =
+    agency.cover_url ||
     agency.avatar_url ||
     '/images/aurax-og.jpg'
 
   return {
-    title: `${agency.full_name} | ${listingsCount} biens immobiliers sur AURAX`,
+    title: `${agency.full_name} | Agence immobilière au Togo • AURAX`,
 
     description,
 
     keywords: [
       agency.full_name,
-      'Agence immobilière',
-      'Immobilier',
       'AURAX',
-      ...new Set(listings.map((l) => l.zone_saisie)),
-      ...new Set(listings.map((l) => l.property_type)),
+      'Immobilier',
+      'Immobilier Togo',
+      'Agence immobilière',
+      'Agence immobilière Togo',
+      'Maison à vendre',
+      'Appartement',
+      'Terrain',
+      'Villa',
+      'Location',
+      'Vente',
+      ...new Set(listings.map((listing) => listing.zone_saisie)),
+      ...new Set(listings.map((listing) => listing.property_type)),
     ],
 
     openGraph: {
       title: `${agency.full_name} • AURAX`,
       description,
+      url: `https://aurax.tg/stand/${agency.id}`,
+      siteName: 'AURAX',
+      locale: 'fr_FR',
       type: 'website',
       images: [
         {
@@ -65,7 +77,7 @@ export function buildAgencyMetadata({
     },
 
     alternates: {
-      canonical: `/agence/${agency.id}`,
+      canonical: `https://aurax.tg/stand/${agency.id}`,
     },
   }
 }

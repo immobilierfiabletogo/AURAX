@@ -2,7 +2,13 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { Home, MapPin, Zap } from 'lucide-react'
+import {
+  BadgeCheck,
+  Building2,
+  Heart,
+  MapPin,
+  Zap,
+} from 'lucide-react'
 
 export interface Listing {
   id: string
@@ -15,6 +21,10 @@ export interface Listing {
   is_boosted: boolean
 }
 
+interface Props {
+  listing: Listing
+}
+
 function formatPrice(price: number) {
   return new Intl.NumberFormat('fr-TG', {
     style: 'currency',
@@ -23,75 +33,140 @@ function formatPrice(price: number) {
   }).format(price)
 }
 
-interface Props {
-  listing: Listing
-}
-
-export default function ListingCard({ listing }: Props) {
+export default function ListingCard({
+  listing,
+}: Props) {
   return (
     <Link
       href={`/biens/${listing.id}`}
-      className={`group flex flex-col overflow-hidden rounded-2xl bg-white border transition-all duration-200 hover:-translate-y-1 hover:shadow-xl ${
-        listing.is_boosted
-          ? 'border-amber-300'
-          : 'border-slate-100'
-      }`}
+      className="
+        group
+        overflow-hidden
+        rounded-[32px]
+        border
+        border-slate-200
+        bg-white
+        shadow-sm
+        transition-all
+        duration-500
+        hover:-translate-y-2
+        hover:border-emerald-200
+        hover:shadow-2xl
+      "
     >
-      <div
-        className="relative overflow-hidden bg-slate-100"
-        style={{ aspectRatio: '4 / 3' }}
-      >
-        {listing.images_urls?.length ? (
+      <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
+
+        {listing.images_urls?.[0] ? (
           <Image
             src={listing.images_urls[0]}
             alt={listing.title}
             fill
-            sizes="(max-width:768px)100vw,(max-width:1200px)50vw,25vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-            priority={false}
+            sizes="(max-width:768px)100vw,(max-width:1280px)50vw,33vw"
+            className="object-cover transition-transform duration-700 group-hover:scale-105"
           />
         ) : (
           <div className="flex h-full items-center justify-center">
-            <Home className="h-10 w-10 text-slate-300" />
+            <Building2 className="h-14 w-14 text-slate-300" />
           </div>
         )}
 
-        <div className="absolute left-2.5 top-2.5 flex gap-2">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+
+        <div className="absolute left-5 top-5 flex gap-2">
+
           {listing.is_boosted && (
-            <span className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-0.5 text-[9px] font-black uppercase text-white shadow">
-              <Zap className="h-2.5 w-2.5 fill-white" />
-              TOP
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-3 py-1 text-[11px] font-black text-slate-900 shadow-lg">
+              <Zap className="h-3.5 w-3.5" />
+              PREMIUM
             </span>
           )}
+
         </div>
 
-        <span className="absolute right-2.5 top-2.5 rounded-lg bg-black/60 px-2 py-0.5 text-[9px] font-bold uppercase text-white backdrop-blur">
+        <span
+          className={`
+            absolute
+            right-5
+            top-5
+            rounded-full
+            px-3
+            py-1
+            text-[11px]
+            font-bold
+
+            ${
+              listing.transaction_type === 'location'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-slate-900 text-white'
+            }
+          `}
+        >
           {listing.transaction_type === 'location'
             ? 'Location'
             : 'Vente'}
         </span>
+
+        <button
+          className="
+            absolute
+            bottom-5
+            right-5
+            flex
+            h-11
+            w-11
+            items-center
+            justify-center
+            rounded-full
+            bg-white/90
+            backdrop-blur
+            transition
+            hover:scale-110
+            hover:bg-white
+          "
+        >
+          <Heart className="h-5 w-5 text-slate-500" />
+        </button>
+
       </div>
 
-      <div className="flex flex-1 flex-col p-3.5">
-        <span className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-          {listing.property_type}
-        </span>
+      <div className="space-y-5 p-6">
 
-        <h3 className="mb-2 line-clamp-1 text-sm font-bold text-slate-900 transition-colors group-hover:text-emerald-600">
-          {listing.title}
-        </h3>
+        <div className="flex items-center justify-between">
 
-        <div className="mt-auto flex items-center justify-between">
-          <span className="text-sm font-black text-slate-950">
-            {formatPrice(listing.price)}
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-slate-600">
+            {listing.property_type}
           </span>
 
-          <span className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
-            <MapPin className="h-3 w-3 text-slate-400" />
+          {listing.is_boosted && (
+            <BadgeCheck className="h-5 w-5 text-amber-500" />
+          )}
+
+        </div>
+
+        <div>
+
+          <div className="text-3xl font-black text-emerald-700">
+            {formatPrice(listing.price)}
+          </div>
+
+          <h3 className="mt-3 line-clamp-2 text-xl font-black leading-snug text-slate-900 transition-colors group-hover:text-emerald-600">
+            {listing.title}
+          </h3>
+
+        </div>
+
+        <div className="flex items-center gap-2 text-sm text-slate-500">
+
+          <MapPin className="h-4 w-4 shrink-0" />
+
+          <span className="line-clamp-1">
             {listing.zone_saisie}
           </span>
+
         </div>
+
       </div>
+
     </Link>
   )
 }

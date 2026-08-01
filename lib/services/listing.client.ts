@@ -9,10 +9,18 @@ const normalize = (value: string) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
+interface CatalogFilters {
+  transactionType?: string;
+  propertyType?: string;
+  minPrice?: number;
+  maxPrice?: number;
+}
+
 export class ListingClientService {
   static async getCatalog(
     page: number,
-    search: string
+    search: string,
+    filters?: CatalogFilters
   ) {
     const supabase = createClient();
 
@@ -28,7 +36,8 @@ export class ListingClientService {
             id,
             full_name,
             avatar_url,
-            plan
+            plan,
+            verified
           )
         `,
         {
@@ -46,9 +55,42 @@ export class ListingClientService {
       .range(from, to);
 
     if (search.trim()) {
-      query = query.ilike(
-        "zone_normalized",
-        `%${normalize(search)}%`
+      const value = normalize(search);
+
+      query = query.or(
+        [
+          `zone_normalized.ilike.%${value}%`,
+          `title.ilike.%${search}%`,
+          `property_type.ilike.%${search}%`,
+        ].join(",")
+      );
+    }
+
+    if (filters?.transactionType) {
+      query = query.eq(
+        "transaction_type",
+        filters.transactionType
+      );
+    }
+
+    if (filters?.propertyType) {
+      query = query.eq(
+        "property_type",
+        filters.propertyType
+      );
+    }
+
+    if (filters?.minPrice != null) {
+      query = query.gte(
+        "price",
+        filters.minPrice
+      );
+    }
+
+    if (filters?.maxPrice != null) {
+      query = query.lte(
+        "price",
+        filters.maxPrice
       );
     }
 
@@ -78,26 +120,26 @@ export class ListingClientService {
   }
 
   static async getAgency(agentId: string) {
-  const supabase = createClient();
+    const supabase = createClient();
 
-  return supabase
-    .from("profiles")
-    .select(`
-      id,
-      full_name,
-      avatar_url,
-      cover_url,
-      description,
-      phone_number,
-      website,
-      adresse,
-      plan,
-      verified,
-      created_at
-    `)
-    .eq("id", agentId)
-    .single();
-}
+    return supabase
+      .from("profiles")
+      .select(`
+        id,
+        full_name,
+        avatar_url,
+        cover_url,
+        description,
+        phone_number,
+        website,
+        adresse,
+        plan,
+        verified,
+        created_at
+      `)
+      .eq("id", agentId)
+      .single();
+  }
 
   static async getSimilar(
     transactionType: string,
@@ -113,6 +155,12 @@ export class ListingClientService {
       .eq("property_type", propertyType)
       .eq("is_active", true)
       .neq("id", listingId)
+      .order("is_boosted", {
+        ascending: false,
+      })
+      .order("created_at", {
+        ascending: false,
+      })
       .limit(4);
   }
 
@@ -150,9 +198,12 @@ export class ListingClientService {
   static async incrementViews(id: string) {
     const supabase = createClient();
 
-    return supabase.rpc("increment_views", {
-      listing_id: id,
-    });
+    return supabase.rpc(
+      "increment_views",
+      {
+        listing_id: id,
+      }
+    );
   }
 
   static async incrementWhatsapp(id: string) {

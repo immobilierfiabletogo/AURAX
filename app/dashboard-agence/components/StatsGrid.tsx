@@ -8,13 +8,15 @@ import {
   Zap,
 } from 'lucide-react'
 
+
 interface Props {
-  listings: number
-  views: number
-  active: number
-  whatsapp: number
-  boosted: number
+  listings:number
+  views:number
+  active:number
+  whatsapp:number
+  boosted:number
 }
+
 
 
 const cards = [
@@ -22,66 +24,35 @@ const cards = [
     key: 'listings',
     label: 'Annonces publiées',
     icon: Home,
-    color: 'amber',
     featured: true,
   },
   {
     key: 'views',
     label: 'Vues totales',
     icon: Eye,
-    color: 'slate',
     featured: false,
   },
   {
     key: 'active',
-    label: 'En ligne',
+    label: 'Biens en ligne',
     icon: CheckCircle2,
-    color: 'emerald',
     featured: false,
   },
   {
     key: 'whatsapp',
-    label: 'WhatsApp',
+    label: 'Contacts WhatsApp',
     icon: MessageSquare,
-    color: 'blue',
     featured: false,
   },
   {
     key: 'boosted',
-    label: 'Boostées',
+    label: 'Annonces boostées',
     icon: Zap,
-    color: 'purple',
     featured: false,
   },
 ] as const
 
-const colors = {
-  amber: {
-    bg: 'bg-amber-50',
-    icon: 'text-amber-600',
-    glow: 'from-amber-200/30',
-  },
-  slate: {
-    bg: 'bg-slate-100',
-    icon: 'text-slate-700',
-    glow: 'from-slate-300/20',
-  },
-  emerald: {
-    bg: 'bg-emerald-50',
-    icon: 'text-emerald-600',
-    glow: 'from-emerald-200/30',
-  },
-  blue: {
-    bg: 'bg-blue-50',
-    icon: 'text-blue-600',
-    glow: 'from-blue-200/30',
-  },
-  purple: {
-    bg: 'bg-violet-50',
-    icon: 'text-violet-600',
-    glow: 'from-violet-200/30',
-  },
-} as const
+
 
 export default function StatsGrid({
   listings,
@@ -89,86 +60,195 @@ export default function StatsGrid({
   active,
   whatsapp,
   boosted,
-}: Props) {
-  const values = {
-    listings,
-    views,
-    active,
-    whatsapp,
-    boosted,
-  }
+}:Props){
 
-  return (
-    <section className="mb-10 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-6">
-      {cards.map((card) => {
-        const Icon = card.icon
-        const color = colors[card.color]
-        const value = values[card.key]
 
-        return (
-          <article
-            key={card.key}
-            className={`
-              group
-              relative
-              overflow-hidden
-              rounded-[30px]
-              border
-              border-slate-200/70
-              bg-white
-              p-7
-              shadow-[0_1px_3px_rgba(15,23,42,.04)]
-              transition-all
-              duration-300
-              hover:scale-[1.015]
-              hover:border-slate-300
-              hover:shadow-2xl
-              ${card.featured ? 'xl:col-span-2' : 'xl:col-span-1'}
-            `}
-          >
-            <div
-              className={`
-                absolute
-                inset-0
-                bg-gradient-to-br
-                ${color.glow}
-                via-transparent
-                to-transparent
-                opacity-0
-                transition-opacity
-                duration-500
-                group-hover:opacity-100
-              `}
-            />
+const values = {
+  listings,
+  views,
+  active,
+  whatsapp,
+  boosted,
+}
 
-            <div className="relative flex items-start justify-between">
-              <div
-                className={`
-                  flex
-                  h-11
-                  w-11
-                  items-center
-                  justify-center
-                  rounded-xl
-                  ${color.bg}
-                `}
-              >
-                <Icon className={`h-5 w-5 ${color.icon}`} />
-              </div>
-            </div>
 
-            <div className="relative mt-10">
-              <div className="text-5xl font-extrabold leading-none tracking-tight text-slate-950">
-                {new Intl.NumberFormat('fr-FR').format(value)}
-              </div>
 
-              <p className="mt-3 text-sm font-medium text-slate-500">
-                {card.label}
-              </p>
-            </div>
-          </article>
-        )
-      })}
-    </section>
-  )
+return (
+
+<section
+className="
+mb-10
+grid
+grid-cols-1
+gap-5
+sm:grid-cols-2
+xl:grid-cols-5
+"
+>
+
+
+{cards.map((card)=>{
+
+const Icon = card.icon
+const value = values[card.key]
+
+
+return (
+
+<article
+key={card.key}
+className={`
+group
+relative
+overflow-hidden
+rounded-[26px]
+border
+border-emerald-100
+bg-gradient-to-br
+from-white
+via-white
+to-emerald-50/40
+p-6
+shadow-[0_18px_50px_rgba(16,185,129,0.08)]
+transition-all
+duration-300
+hover:-translate-y-1
+hover:shadow-[0_25px_70px_rgba(16,185,129,0.15)]
+${card.featured ? 'xl:scale-[1.02]' : ''}
+`}
+>
+
+
+{/* Glow */}
+
+<div
+className="
+absolute
+-right-10
+-top-10
+h-32
+w-32
+rounded-full
+bg-emerald-400/20
+blur-3xl
+opacity-0
+transition
+group-hover:opacity-100
+"
+/>
+
+
+
+<div
+className="
+relative
+flex
+items-center
+justify-between
+"
+>
+
+
+<div
+className="
+flex
+h-12
+w-12
+items-center
+justify-center
+rounded-2xl
+bg-gradient-to-br
+from-emerald-500
+to-emerald-700
+shadow-lg
+shadow-emerald-500/20
+"
+>
+
+<Icon
+className="
+h-5
+w-5
+text-white
+"
+/>
+
+</div>
+
+
+{card.featured && (
+
+<span
+className="
+rounded-full
+bg-amber-50
+px-3
+py-1
+text-[10px]
+font-bold
+uppercase
+tracking-widest
+text-amber-700
+"
+>
+Principal
+</span>
+
+)}
+
+
+</div>
+
+
+
+
+<div
+className="
+relative
+mt-8
+"
+>
+
+
+<div
+className="
+text-4xl
+font-bold
+tracking-tight
+text-slate-950
+"
+>
+{new Intl.NumberFormat('fr-FR').format(value)}
+</div>
+
+
+
+<p
+className="
+mt-3
+text-sm
+font-medium
+text-slate-500
+"
+>
+{card.label}
+</p>
+
+
+</div>
+
+
+
+</article>
+
+)
+
+})}
+
+
+
+</section>
+
+)
+
 }

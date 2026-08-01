@@ -1,116 +1,516 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { createClient } from "@/lib/supabase/client";
 import Link from 'next/link'
+import {
+  Eye,
+  EyeOff,
+  Lock,
+  Loader2,
+  Mail,
+  Building2,
+  User,
+} from 'lucide-react'
+
+import { createClient } from '@/lib/supabase/client'
+
 
 function LoginContent() {
   const router = useRouter()
-  const supabase = createClient()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const searchParams = useSearchParams()
+
+  const supabase = createClient()
+
   const confirmed = searchParams.get('confirmed')
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+
+  const [showPassword, setShowPassword] =
+    useState(false)
+
+  const [loading, setLoading] =
+    useState(false)
+
+  const [error, setError] =
+    useState<string | null>(null)
+
+
+  async function handleLogin(
+    e: React.FormEvent<HTMLFormElement>
+  ) {
     e.preventDefault()
+
     setLoading(true)
     setError(null)
 
-    // 🔐 1. Connexion de l'utilisateur
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+
+    const {
+      data,
+      error: signInError,
+    } =
+      await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
 
     if (signInError) {
-      setError('Adresse e-mail ou mot de passe incorrect.')
+
+      if (
+        signInError.message
+          .toLowerCase()
+          .includes('email not confirmed')
+      ) {
+        setError(
+          "Votre adresse e-mail n'est pas encore confirmée."
+        )
+      } else {
+        setError(
+          "Adresse e-mail ou mot de passe incorrect."
+        )
+      }
+
       setLoading(false)
       return
     }
 
-    if (data.user) {
-      // 📊 2. Récupération du type de compte (particulier ou agence) pour la redirection
-      const { data: profile } = await supabase
+
+    if (!data.user) {
+      setError(
+        "Impossible de récupérer votre compte."
+      )
+
+      setLoading(false)
+      return
+    }
+
+
+    const {
+      data: profile,
+    } =
+      await supabase
         .from('profiles')
         .select('user_type')
         .eq('id', data.user.id)
         .single()
 
-      if (profile?.user_type === 'agence') {
-        router.push('/dashboard-agence')
-      } else {
-        router.push('/dashboard-agence')
-      }
+
+    if (!profile) {
+
+      setError(
+        "Votre profil n'est pas encore configuré."
+      )
+
+      setLoading(false)
+      return
     }
+
+
+    if (profile.user_type === 'agence') {
+      router.push('/dashboard-agence')
+    } else {
+      router.push('/dashboard-agence')
+    }
+
+
     router.refresh()
   }
 
+
+
   return (
-    <>
-      <style>{`
-        .auth { min-height: calc(100vh - 60px); background: #f7f7f5; display: flex; align-items: center; justify-content: center; padding: 24px; }
-        .auth-card { background: #fff; border: 1px solid rgba(26,28,34,0.08); border-radius: 20px; padding: 40px; width: 100%; max-width: 420px; box-shadow: 0 8px 32px rgba(26,28,34,0.06); }
-        .auth-logo { font-size: 22px; font-weight: 800; letter-spacing: -1px; color: #1a1c22; text-align: center; margin-bottom: 6px; }
-        .auth-logo span { color: #fbb03b; }
-        .auth-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: #1a1c22; text-align: center; margin-bottom: 4px; }
-        .auth-sub { font-size: 13px; color: #8a8e9a; text-align: center; margin-bottom: 28px; }
-        .auth-error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 12px 14px; border-radius: 10px; font-size: 13px; margin-bottom: 16px; }
-        .auth-label { display: block; font-size: 13px; font-weight: 600; color: #1a1c22; margin-bottom: 6px; }
-        .auth-input { width: 100%; padding: 12px 14px; border: 1px solid #e8e8e4; border-radius: 10px; font-size: 14px; font-family: inherit; color: #1a1c22; outline: none; transition: all 0.15s; box-sizing: border-box; }
-        .auth-input:focus { border-color: #fbb03b; box-shadow: 0 0 0 3px rgba(251,176,59,0.1); }
-        .auth-field { margin-bottom: 16px; }
-        .auth-btn { width: 100%; padding: 14px; background: #1a1c22; color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.15s; margin-top: 8px; }
-        .auth-btn:hover { background: #2a2d38; }
-        .auth-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .auth-footer { text-align: center; margin-top: 20px; font-size: 13px; color: #8a8e9a; }
-        .auth-footer a { color: #fbb03b; font-weight: 600; text-decoration: none; }
-        .auth-footer a:hover { text-decoration: underline; }
-      `}</style>
 
-      <div className="auth">
-        <div className="auth-card">
-          <div className="auth-logo">AU<span>RAX</span></div>
-          <h1 className="auth-title">Connexion</h1>
-          <p className="auth-sub">Accédez à votre espace immobilier</p>
+    <main className="min-h-screen bg-slate-50 px-4 py-10">
 
-          <form onSubmit={handleLogin}>
-            {confirmed && (
-              <div style={{background:'#f0fdf4', border:'1px solid #bbf7d0', color:'#166534', padding:'12px 14px', borderRadius:'10px', fontSize:'13px', marginBottom:'16px', fontWeight:'600'}}>
-                ✅ Email confirmé avec succès. Connectez-vous maintenant.
-             </div>
-            )}
-            {error && <div className="auth-error">{error}</div>}
+      <section className="mx-auto flex max-w-md items-center justify-center">
 
-            <div className="auth-field">
-              <label className="auth-label">Adresse e-mail</label>
-              <input className="auth-input" type="email" required placeholder="exemple@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <div
+          className="
+          w-full
+          rounded-[28px]
+          border
+          border-slate-200
+          bg-white
+          p-8
+          shadow-[0_24px_80px_rgba(15,23,42,0.08)]
+          sm:p-10
+          "
+        >
+
+          {/* Logo */}
+
+          <header className="mb-10 text-center">
+
+            <div
+              className="
+              mx-auto mb-5
+              flex h-14 w-14
+              items-center justify-center
+              rounded-2xl
+              bg-emerald-50
+              text-emerald-700
+              "
+            >
+              <Building2 className="h-7 w-7" />
             </div>
 
-            <div className="auth-field">
-              <label className="auth-label">Mot de passe</label>
-              <input className="auth-input" type="password" required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
+
+            <p
+              className="
+              text-xs
+              font-semibold
+              uppercase
+              tracking-[0.25em]
+              text-slate-400
+              "
+            >
+              AURAX
+            </p>
+
+
+            <h1
+              className="
+              mt-3
+              text-3xl
+              font-bold
+              tracking-tight
+              text-slate-900
+              "
+            >
+              Connexion
+            </h1>
+
+
+            <p
+              className="
+              mt-3
+              text-sm
+              leading-6
+              text-slate-500
+              "
+            >
+              Accédez à votre espace immobilier.
+            </p>
+
+          </header>
+
+
+
+          {confirmed && (
+
+            <div
+              className="
+              mb-6
+              rounded-2xl
+              border
+              border-emerald-200
+              bg-emerald-50
+              px-5
+              py-4
+              text-sm
+              font-medium
+              text-emerald-700
+              "
+            >
+              ✅ Email confirmé avec succès.
+              Connectez-vous maintenant.
             </div>
 
-            <button type="submit" className="auth-btn" disabled={loading}>
-              {loading ? 'Connexion...' : 'Se connecter'}
+          )}
+
+
+
+          {error && (
+
+            <div
+              className="
+              mb-6
+              rounded-2xl
+              border
+              border-red-200
+              bg-red-50
+              px-5
+              py-4
+              text-sm
+              text-red-700
+              "
+            >
+              {error}
+            </div>
+
+          )}
+
+
+
+          <form
+            onSubmit={handleLogin}
+            className="space-y-6"
+          >
+
+
+            {/* Email */}
+
+            <div className="space-y-2">
+
+              <label
+                className="
+                text-xs
+                font-semibold
+                uppercase
+                tracking-[0.2em]
+                text-slate-500
+                "
+              >
+                Adresse e-mail
+              </label>
+
+
+              <div className="relative">
+
+                <Mail
+                  className="
+                  pointer-events-none
+                  absolute
+                  left-5
+                  top-1/2
+                  h-5
+                  w-5
+                  -translate-y-1/2
+                  text-slate-400
+                  "
+                />
+
+
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e)=>
+                    setEmail(e.target.value)
+                  }
+                  placeholder="contact@agence.com"
+                  className="
+                  h-16
+                  w-full
+                  rounded-2xl
+                  border
+                  border-slate-200
+                  bg-white
+                  pl-14
+                  pr-5
+                  text-sm
+                  outline-none
+                  transition
+                  focus:border-emerald-600
+                  focus:ring-4
+                  focus:ring-emerald-50
+                  "
+                />
+
+              </div>
+
+            </div>
+
+
+
+            {/* Password */}
+
+            <div className="space-y-2">
+
+              <label
+                className="
+                text-xs
+                font-semibold
+                uppercase
+                tracking-[0.2em]
+                text-slate-500
+                "
+              >
+                Mot de passe
+              </label>
+
+
+              <div className="relative">
+
+                <Lock
+                  className="
+                  pointer-events-none
+                  absolute
+                  left-5
+                  top-1/2
+                  h-5
+                  w-5
+                  -translate-y-1/2
+                  text-slate-400
+                  "
+                />
+
+
+                <input
+                  type={
+                    showPassword
+                      ? 'text'
+                      : 'password'
+                  }
+                  required
+                  value={password}
+                  onChange={(e)=>
+                    setPassword(e.target.value)
+                  }
+                  placeholder="••••••••"
+                  className="
+                  h-16
+                  w-full
+                  rounded-2xl
+                  border
+                  border-slate-200
+                  bg-white
+                  pl-14
+                  pr-14
+                  text-sm
+                  outline-none
+                  transition
+                  focus:border-emerald-600
+                  focus:ring-4
+                  focus:ring-emerald-50
+                  "
+                />
+
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowPassword(!showPassword)
+                  }
+                  className="
+                  absolute
+                  right-5
+                  top-1/2
+                  -translate-y-1/2
+                  text-slate-400
+                  hover:text-slate-700
+                  "
+                >
+
+                  {
+                    showPassword
+                      ? <EyeOff className="h-5 w-5"/>
+                      : <Eye className="h-5 w-5"/>
+                  }
+
+                </button>
+
+              </div>
+
+            </div>
+
+
+
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="
+              flex
+              h-16
+              w-full
+              items-center
+              justify-center
+              rounded-2xl
+              bg-emerald-700
+              text-sm
+              font-semibold
+              text-white
+              transition
+              hover:bg-emerald-800
+              disabled:cursor-not-allowed
+              disabled:bg-slate-300
+              "
+            >
+
+              {
+                loading ? (
+
+                  <>
+                    <Loader2
+                      className="
+                      mr-2
+                      h-5
+                      w-5
+                      animate-spin
+                      "
+                    />
+
+                    Connexion...
+
+                  </>
+
+                ) : (
+
+                  'Se connecter'
+
+                )
+
+              }
+
             </button>
+
+
           </form>
 
-          <div className="auth-footer">
-            Pas encore de compte ?{' '}
-            <Link href="/register">Créer un compte</Link>
+
+
+          <div
+            className="
+            mt-8
+            border-t
+            border-slate-200
+            pt-6
+            text-center
+            text-sm
+            text-slate-500
+            "
+          >
+
+            Pas encore membre ?{' '}
+
+            <Link
+              href="/register"
+              className="
+              font-semibold
+              text-emerald-700
+              hover:text-emerald-800
+              "
+            >
+              Créer un compte
+            </Link>
+
+
           </div>
+
+
         </div>
-      </div>
-    </>
+
+      </section>
+
+    </main>
+
   )
 }
 
+
+
 export default function LoginPage() {
+
   return (
+
     <Suspense fallback={null}>
+
       <LoginContent />
+
     </Suspense>
+
   )
 }

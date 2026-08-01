@@ -21,6 +21,19 @@ export function useListings() {
 
   const hasMoreRef = useRef(true)
 
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const cache = useRef<
+    Record<
+      string,
+      {
+        listings: Listing[]
+        total: number
+        hasMore: boolean
+      }
+    >
+  >({})
+
   const [listings, setListings] = useState<Listing[]>([])
 
   const [loading, setLoading] = useState(true)
@@ -35,8 +48,73 @@ export function useListings() {
 
   const [search, setSearch] = useState('')
 
+  const [query, setQuery] = useState('')
+
+  // Préparation des futurs filtres
+  const [transactionType, setTransactionType] =
+    useState('')
+
+  const [propertyType, setPropertyType] =
+    useState('')
+
+  const [priceMin, setPriceMin] =
+    useState<number>()
+
+  const [priceMax, setPriceMax] =
+    useState<number>()
+
+  // Debounce
+  useEffect(() => {
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current)
+    }
+
+    searchTimeout.current = setTimeout(() => {
+      setQuery(search)
+    }, 350)
+
+    return () => {
+      if (searchTimeout.current) {
+        clearTimeout(searchTimeout.current)
+      }
+    }
+  }, [search])
+
   const fetchListings = useCallback(
     async (page: number) => {
+      const cacheKey = JSON.stringify({
+        page,
+        query,
+        transactionType,
+        propertyType,
+        priceMin,
+        priceMax,
+      })
+
+      if (cache.current[cacheKey]) {
+        const data = cache.current[cacheKey]
+
+        if (page === 1) {
+          setListings(data.listings)
+        } else {
+          setListings(previous => [
+            ...previous,
+            ...data.listings.filter(
+              item =>
+                !previous.some(
+                  p => p.id === item.id
+                )
+            ),
+          ])
+        }
+
+        setTotal(data.total)
+        setHasMore(data.hasMore)
+        hasMoreRef.current = data.hasMore
+
+        return
+      }
+
       try {
         if (page === 1) {
           setLoading(true)
@@ -48,11 +126,23 @@ export function useListings() {
         const result =
           await ListingClientService.getCatalog(
             page,
-            search
+            query,
+            {
+              transactionType,
+              propertyType,
+              minPrice: priceMin,
+              maxPrice: priceMax,
+            }
           )
 
         const rows =
           result.listings as Listing[]
+
+        cache.current[cacheKey] = {
+          listings: rows,
+          total: result.total,
+          hasMore: result.hasMore,
+        }
 
         if (page === 1) {
           setListings(rows)
@@ -88,12 +178,17 @@ export function useListings() {
         loadingRef.current = false
       }
     },
-    [search]
+    [
+      query,
+      transactionType,
+      propertyType,
+      priceMin,
+      priceMax,
+    ]
   )
 
   useEffect(() => {
     pageRef.current = 1
-
     fetchListings(1)
   }, [fetchListings])
 
@@ -117,7 +212,7 @@ export function useListings() {
         },
         {
           threshold: 0.15,
-          rootMargin: '400px',
+          rootMargin: '900px',
         }
       )
 
@@ -141,9 +236,23 @@ export function useListings() {
     loading,
     loadingMore,
     total,
+    hasMore,
+
     search,
     setSearch,
-    hasMore,
+
+    transactionType,
+    setTransactionType,
+
+    propertyType,
+    setPropertyType,
+
+    priceMin,
+    setPriceMin,
+
+    priceMax,
+    setPriceMax,
+
     observerRef,
   }
 }
