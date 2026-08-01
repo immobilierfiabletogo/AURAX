@@ -89,29 +89,7 @@ export default function HomePage() {
 
       </section>
 
-      <div className="fixed bottom-0 left-0 right-0 border-t border-slate-200 bg-white/95 p-4 backdrop-blur lg:hidden">
-
-        <Link
-          href="/deposer"
-          className="
-            flex
-            w-full
-            items-center
-            justify-center
-            rounded-2xl
-            bg-emerald-600
-            py-4
-            text-sm
-            font-bold
-            text-white
-            transition
-            hover:bg-emerald-700
-          "
-        >
-          Déposer une annonce
-        </Link>
-
-      </div>
+  
 
     </main>
   )
