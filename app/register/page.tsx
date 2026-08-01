@@ -192,40 +192,7 @@ function RegisterContent() {
     },
 
 
-    particulier: {
-
-      icon: User,
-
-      title: 'Propriétaire',
-
-      description:
-        "Publiez votre bien à vendre ou à louer et échangez directement avec les personnes intéressées.",
-
-
-      advantages: [
-
-        'Publication rapide',
-
-        'Contact direct',
-
-        'Gestion simple des annonces',
-
-        'Sans espace professionnel',
-
-      ],
-
-
-      color: '#059669',
-
-      background: '#ECFDF5',
-
-      border: '#A7F3D0',
-
-
-      buttonLabel:
-        'Créer mon compte propriétaire',
-
-    },
+   
 
   }
 
@@ -239,30 +206,18 @@ function RegisterContent() {
 
         {step === 'type' ? (
 
-          <section className="-mt-10 relative z-20 mx-auto max-w-6xl lg:-mt-16">
+  <section className="-mt-10 relative z-20 mx-auto max-w-3xl lg:-mt-16">
 
-            <div className="grid gap-8 lg:grid-cols-2">
+    <ProfileCard
+      {...profiles.agence}
+      onClick={() =>
+        handleSelectProfile('agence')
+      }
+    />
 
-
-              <ProfileCard
-                {...profiles.particulier}
-                onClick={() =>
-                  handleSelectProfile('particulier')
-                }
-              />
-
-
-              <ProfileCard
-                {...profiles.agence}
-                onClick={() =>
-                  handleSelectProfile('agence')
-                }
-              />
+  </section>
 
 
-            </div>
-
-          </section>
 
 
         ) : (
@@ -326,31 +281,7 @@ function RegisterContent() {
 
 
 
-            <div className="mt-8 text-center">
-
-              <button
-
-                type="button"
-
-                onClick={() => {
-
-                  setStep('type')
-
-                  setError(null)
-
-                }}
-
-                className="text-sm font-semibold text-slate-500 transition hover:text-emerald-700"
-
-              >
-
-                ← Changer de profil
-
-              </button>
-
-
-            </div>
-
+          
 
           </section>
 

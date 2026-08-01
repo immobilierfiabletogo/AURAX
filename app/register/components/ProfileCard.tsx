@@ -1,6 +1,11 @@
 'use client'
 
-import { ArrowRight, Check } from 'lucide-react'
+import {
+  Building2,
+  Check,
+  ArrowRight,
+} from 'lucide-react'
+
 
 interface ProfileCardProps {
   icon: React.ElementType
@@ -14,90 +19,221 @@ interface ProfileCardProps {
   onClick: () => void
 }
 
+
 export default function ProfileCard({
   icon: Icon,
   title,
   description,
   advantages,
-  color,
-  background,
-  border,
   buttonLabel,
   onClick,
 }: ProfileCardProps) {
+
   return (
-    <button
-      onClick={onClick}
-      className="group flex h-full w-full flex-col rounded-[30px] border bg-white p-8 text-left shadow-sm transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl cursor-pointer"
-      style={{ borderColor: border }}
+
+    <div
+      className="
+        group relative overflow-hidden
+        rounded-[36px]
+        border border-emerald-100
+        bg-white
+        p-8
+        shadow-[0_25px_80px_rgba(15,23,42,.08)]
+        transition-all
+        duration-500
+        hover:-translate-y-2
+        hover:shadow-[0_35px_90px_rgba(5,150,105,.15)]
+      "
     >
-      {/* Icône */}
+
+      {/* Glow background */}
+
       <div
-        className="flex h-16 w-16 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110"
-        style={{ background }}
-      >
-        <Icon
-          className="h-8 w-8"
-          style={{ color }}
-        />
-      </div>
+        className="
+          absolute
+          -right-20
+          -top-20
+          h-56
+          w-56
+          rounded-full
+          bg-emerald-100/50
+          blur-3xl
+          transition
+          group-hover:bg-emerald-200/60
+        "
+      />
 
-      {/* Titre */}
-      <h2 className="mt-8 text-2xl font-black text-slate-900">
-        {title}
-      </h2>
 
-      {/* Description */}
-      <p className="mt-3 text-sm leading-7 text-slate-500">
-        {description}
-      </p>
+      <div className="relative">
 
-      {/* Séparateur */}
-      <div className="my-8 h-px bg-slate-100" />
 
-      {/* Avantages */}
-      <div className="space-y-4">
-
-        {advantages.map((item) => (
-
-          <div
-            key={item}
-            className="flex items-center gap-3"
-          >
-            <div
-              className="flex h-6 w-6 items-center justify-center rounded-full"
-              style={{ background }}
-            >
-              <Check
-                className="h-3.5 w-3.5"
-                style={{ color }}
-              />
-            </div>
-
-            <span className="text-sm font-medium text-slate-700">
-              {item}
-            </span>
-
-          </div>
-
-        ))}
-
-      </div>
-
-      {/* CTA */}
-      <div className="mt-auto pt-10">
+        {/* Badge */}
 
         <div
-          className="flex items-center justify-center gap-3 rounded-2xl px-6 py-4 text-sm font-black text-white transition-all duration-300 group-hover:shadow-lg"
-          style={{ backgroundColor: color }}
+          className="
+            mb-8
+            inline-flex
+            items-center
+            gap-2
+            rounded-full
+            border
+            border-emerald-200
+            bg-emerald-50
+            px-4
+            py-2
+            text-xs
+            font-bold
+            uppercase
+            tracking-[0.25em]
+            text-emerald-700
+          "
         >
-          {buttonLabel}
+          <Building2 size={14}/>
 
-          <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+          Partenaire AURAX
 
         </div>
 
+
+
+        {/* Icon */}
+
+        <div
+          className="
+            mb-7
+            flex
+            h-20
+            w-20
+            items-center
+            justify-center
+            rounded-3xl
+            bg-gradient-to-br
+            from-emerald-600
+            to-emerald-500
+            text-white
+            shadow-lg
+            shadow-emerald-200
+          "
+        >
+
+          <Icon size={38}/>
+
+        </div>
+
+
+
+        <h3
+          className="
+            text-3xl
+            font-black
+            tracking-tight
+            text-slate-900
+          "
+        >
+          {title}
+        </h3>
+
+
+
+        <p
+          className="
+            mt-4
+            text-lg
+            leading-8
+            text-slate-600
+          "
+        >
+          {description}
+        </p>
+
+
+
+        {/* Advantages */}
+
+        <div className="mt-8 space-y-4">
+
+          {advantages.map((item) => (
+
+            <div
+              key={item}
+              className="
+                flex
+                items-center
+                gap-3
+                text-slate-700
+              "
+            >
+
+              <div
+                className="
+                  flex
+                  h-6
+                  w-6
+                  items-center
+                  justify-center
+                  rounded-full
+                  bg-emerald-100
+                  text-emerald-700
+                "
+              >
+
+                <Check size={14}/>
+
+              </div>
+
+
+              <span className="font-medium">
+                {item}
+              </span>
+
+
+            </div>
+
+          ))}
+
+        </div>
+
+
+
+        {/* CTA */}
+
+        <button
+          onClick={onClick}
+          className="
+            mt-10
+            flex
+            w-full
+            items-center
+            justify-center
+            gap-3
+            rounded-2xl
+            bg-emerald-600
+            py-5
+            text-lg
+            font-bold
+            text-white
+            transition
+            hover:bg-emerald-500
+          "
+        >
+
+          {buttonLabel}
+
+          <ArrowRight
+            size={20}
+            className="
+              transition
+              group-hover:translate-x-1
+            "
+          />
+
+        </button>
+
+
       </div>
-    </button>
+
+
+    </div>
+
   )
 }
