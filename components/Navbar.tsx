@@ -307,7 +307,7 @@ export default function Navbar() {
                 href="/register"
                 className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700"
               >
-                Rejoidre AURAX
+                Rejoindre AURAX
               </Link>
 
             </div>

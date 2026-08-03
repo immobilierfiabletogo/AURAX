@@ -18,25 +18,15 @@ import { useFavorites } from '@/contexts/FavoritesContext'
 
 interface Props {
   listingId: string
-
   title: string
-
   phone: string
-
   price: number
-
   zone: string
-
   transactionType: string
-
   agencyId?: string
-
   agencyName?: string
-
-  agencyAvatar?: string |null
-
+  agencyAvatar?: string | null
   agencyPlan?: string | null
-
   agencyVerified?: boolean
 }
 
@@ -70,6 +60,7 @@ export default function ListingSidebar({
       ? window.location.href
       : ''
 
+  // Texte utilisé uniquement pour le partage
   const shareText = `${title}
 
 Prix : ${formatPrice(price)}
@@ -84,10 +75,28 @@ Découvrez cette annonce sur AURAX :
 
 ${pageUrl}`
 
+  // Texte utilisé uniquement pour WhatsApp
+  const whatsappMessage = `Bonjour,
+
+Je viens de découvrir cette annonce sur AURAX.
+
+🏡 ${title}
+
+📍 ${zone}
+
+💰 ${formatPrice(price)}
+
+Est-elle toujours disponible ?
+
+Voici le lien de l'annonce :
+${pageUrl}
+
+Merci.`
+
   const whatsappUrl = `https://wa.me/${phone.replace(
     /\D/g,
     ''
-  )}?text=${encodeURIComponent(shareText)}`
+  )}?text=${encodeURIComponent(whatsappMessage)}`
 
   async function openWhatsapp() {
     try {
@@ -165,7 +174,6 @@ ${pageUrl}`
                     }`}
                   >
                     <BadgeCheck className="h-4 w-4" />
-
                     {agencyPlan.toUpperCase()}
                   </span>
                 )}

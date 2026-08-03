@@ -5,6 +5,7 @@ import Link from "next/link";
 import "./globals.css";
 
 import Navbar from "@/components/Navbar";
+import MetaPixel from "@/components/analytics/MetaPixel";
 import { FavoritesProvider } from "@/contexts/FavoritesContext";
 
 const inter = Inter({
@@ -19,7 +20,8 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://au-rax.com"),
   openGraph: {
     title: "AURAX | Immobilier à Lomé",
-    description: "La plateforme immobilière du Togo. Simple, rapide et vérifié.",
+    description:
+      "La plateforme immobilière du Togo. Simple, rapide et vérifié.",
     url: "https://au-rax.com",
     siteName: "AURAX",
     images: [
@@ -49,17 +51,17 @@ export default function RootLayout({
   return (
     <html lang="fr" className={inter.variable}>
       <body className="font-sans antialiased bg-slate-50 text-slate-900">
+        <MetaPixel />
+
         <FavoritesProvider>
           <Navbar />
 
-          <main>
-            {children}
-          </main>
+          <main>{children}</main>
 
           <footer className="border-t border-slate-100 py-6 text-center text-xs text-slate-400">
             <Link
               href="/confidentialite"
-              className="mx-2 hover:text-slate-700 transition-colors"
+              className="mx-2 transition-colors hover:text-slate-700"
             >
               Politique de confidentialité
             </Link>
@@ -68,7 +70,7 @@ export default function RootLayout({
 
             <Link
               href="/cgu"
-              className="mx-2 hover:text-slate-700 transition-colors"
+              className="mx-2 transition-colors hover:text-slate-700"
             >
               Conditions d'utilisation
             </Link>
