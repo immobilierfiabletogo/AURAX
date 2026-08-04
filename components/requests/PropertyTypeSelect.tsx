@@ -5,12 +5,6 @@ const PROPERTY_TYPES = [
   'Appartement',
   'Terrain',
   'Villa',
-  'Studio',
-  'Bureau',
-  'Local commercial',
-  'Immeuble',
-  'Ferme',
-  'Entrepôt',
   'Autre',
 ]
 
