@@ -3,7 +3,6 @@
 const PROPERTY_TYPES = [
   'Maison',
   'Appartement',
-  'Terrain',
   'Villa',
   'Autre',
 ]
