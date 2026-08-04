@@ -271,7 +271,7 @@ Merci de m'accompagner dans ma recherche.`
         >
           {loading
             ? 'Envoi en cours...'
-            : 'Trouver mon bien'}
+            : 'Confier ma recherche'}
         </button>
 
         <div className="rounded-3xl bg-slate-50 p-6">
