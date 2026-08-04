@@ -7,6 +7,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import MetaPixel from "@/components/analytics/MetaPixel";
 import { FavoritesProvider } from "@/contexts/FavoritesContext";
+import { Analytics } from "@vercel/analytics/react";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -76,6 +77,7 @@ export default function RootLayout({
             </Link>
           </footer>
         </FavoritesProvider>
+        <Analytics />
       </body>
     </html>
   );
