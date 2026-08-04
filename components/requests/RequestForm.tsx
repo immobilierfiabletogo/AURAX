@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ShieldCheck, CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 import BudgetInput from './BudgetInput'
@@ -96,82 +96,33 @@ Merci de m'accompagner dans ma recherche.`
   }
 
   return (
-    <section className="overflow-hidden rounded-[36px] border border-emerald-100 bg-gradient-to-br from-white via-white to-emerald-50 shadow-[0_30px_70px_rgba(15,23,42,.08)]">
+    <section className="rounded-3xl border border-slate-200 bg-white shadow-xl">
 
-      <div className="border-b border-slate-100 bg-gradient-to-r from-emerald-50 via-white to-white p-10 lg:p-14">
+      <div className="border-b border-slate-100 p-8 lg:p-10">
 
-        <span className="rounded-full bg-emerald-100 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
-          100% Gratuit • Sans engagement
+        <span className="inline-flex rounded-full bg-emerald-100 px-4 py-2 text-xs font-bold uppercase tracking-wider text-emerald-700">
+          Gratuit • Sans engagement
         </span>
 
-        <h2 className="mt-6 text-4xl font-black leading-tight text-slate-900">
-          Trouvez le bien immobilier qui vous correspond.
+        <h2 className="mt-5 text-3xl font-black text-slate-900 lg:text-4xl">
+          Trouvez le bien immobilier qui vous correspond
         </h2>
 
-        <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-600">
-          Vous recherchez un terrain, une maison, un appartement, un local
-          commercial ou une location ?
-          <br />
-          Décrivez simplement votre recherche en moins de 2 minutes.
-          Nous analysons votre demande et vous accompagnons dans votre projet.
+        <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-600">
+          Décrivez simplement votre recherche.
+          Notre équipe analysera votre demande avant de vous recontacter.
         </p>
-
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
-
-          <div className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
-            <CheckCircle2 className="text-emerald-600" size={22} />
-            <span className="font-medium text-slate-700">
-              Service entièrement gratuit
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
-            <CheckCircle2 className="text-emerald-600" size={22} />
-            <span className="font-medium text-slate-700">
-              Réponse rapide sur WhatsApp
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
-            <CheckCircle2 className="text-emerald-600" size={22} />
-            <span className="font-medium text-slate-700">
-              Partout au Togo
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
-            <CheckCircle2 className="text-emerald-600" size={22} />
-            <span className="font-medium text-slate-700">
-              Annonces plus fiables
-            </span>
-          </div>
-
-        </div>
 
       </div>
 
       <form
         onSubmit={handleSubmit}
-        className="space-y-10 p-10 lg:p-14"
+        className="space-y-8 p-8 lg:p-10"
       >
-
-        <div className="rounded-3xl border border-amber-100 bg-amber-50 p-6">
-
-          <h3 className="text-xl font-bold text-slate-900">
-            Marre des fausses annonces et des pertes de temps ?
-          </h3>
-
-          <p className="mt-3 leading-8 text-slate-600">
-            Décrivez simplement le bien que vous recherchez.
-            Nous analysons votre demande avant de vous recontacter afin de
-            vous accompagner dans votre recherche.
-          </p>
-
-        </div>
 
         <div>
 
-          <label className="mb-3 block text-lg font-bold text-slate-900">
+          <label className="mb-3 block text-lg font-semibold text-slate-900">
             Quel bien recherchez-vous ?
           </label>
 
@@ -189,8 +140,8 @@ Merci de m'accompagner dans ma recherche.`
 
         <div>
 
-          <label className="mb-3 block text-lg font-bold text-slate-900">
-            Quel est votre budget ?
+          <label className="mb-3 block text-lg font-semibold text-slate-900">
+            Budget
           </label>
 
           <BudgetInput
@@ -207,7 +158,7 @@ Merci de m'accompagner dans ma recherche.`
 
         <div>
 
-          <label className="mb-3 block text-lg font-bold text-slate-900">
+          <label className="mb-3 block text-lg font-semibold text-slate-900">
             Zone recherchée (facultatif)
           </label>
 
@@ -225,8 +176,8 @@ Merci de m'accompagner dans ma recherche.`
 
         <div>
 
-          <label className="mb-3 block text-lg font-bold text-slate-900">
-            Précisez votre recherche (facultatif)
+          <label className="mb-3 block text-lg font-semibold text-slate-900">
+            Décrivez votre recherche (facultatif)
           </label>
 
           <DescriptionTextarea
@@ -247,23 +198,55 @@ Merci de m'accompagner dans ma recherche.`
           </div>
         )}
 
-        <div className="flex items-start gap-4 rounded-3xl border border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-white p-6">
+                <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-6">
 
-          <div className="rounded-2xl bg-emerald-600 p-3 text-white">
-            <ShieldCheck size={20} />
-          </div>
+          <div className="flex items-start gap-4">
 
-          <div>
+            <div className="rounded-2xl bg-emerald-600 p-3 text-white">
+              <ShieldCheck size={20} />
+            </div>
 
-            <h3 className="font-bold text-slate-900">
-              Que se passe-t-il ensuite ?
-            </h3>
+            <div>
 
-            <p className="mt-2 text-sm leading-7 text-slate-600">
-              Après l'envoi de votre demande, une conversation WhatsApp
-              s'ouvrira automatiquement afin que notre équipe puisse traiter
-              votre recherche dans les meilleurs délais.
-            </p>
+              <h3 className="text-lg font-bold text-slate-900">
+                Après l'envoi
+              </h3>
+
+              <div className="mt-4 space-y-3">
+
+                <div className="flex items-center gap-3">
+                  <CheckCircle2
+                    size={18}
+                    className="text-emerald-600"
+                  />
+                  <span className="text-slate-700">
+                    Votre demande est enregistrée.
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <CheckCircle2
+                    size={18}
+                    className="text-emerald-600"
+                  />
+                  <span className="text-slate-700">
+                    WhatsApp s'ouvrira automatiquement.
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <CheckCircle2
+                    size={18}
+                    className="text-emerald-600"
+                  />
+                  <span className="text-slate-700">
+                    Notre équipe analysera votre recherche.
+                  </span>
+                </div>
+
+              </div>
+
+            </div>
 
           </div>
 
@@ -271,15 +254,76 @@ Merci de m'accompagner dans ma recherche.`
 
         <button
           disabled={loading}
-          className="w-full rounded-2xl bg-emerald-600 py-5 text-lg font-bold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+          className="
+            w-full
+            rounded-2xl
+            bg-emerald-600
+            py-5
+            text-lg
+            font-bold
+            text-white
+            transition
+            duration-300
+            hover:bg-emerald-500
+            disabled:cursor-not-allowed
+            disabled:opacity-60
+          "
         >
           {loading
             ? 'Envoi en cours...'
-            : 'Envoyer'}
+            : 'Trouver mon bien'}
         </button>
 
+        <div className="rounded-3xl bg-slate-50 p-6">
+
+          <div className="grid gap-4 sm:grid-cols-2">
+
+            <div className="flex items-center gap-3">
+              <CheckCircle2
+                size={18}
+                className="text-emerald-600"
+              />
+              <span className="text-slate-700">
+                Service entièrement gratuit
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <CheckCircle2
+                size={18}
+                className="text-emerald-600"
+              />
+              <span className="text-slate-700">
+                Réponse rapide
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <CheckCircle2
+                size={18}
+                className="text-emerald-600"
+              />
+              <span className="text-slate-700">
+                Partout au Togo
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <CheckCircle2
+                size={18}
+                className="text-emerald-600"
+              />
+              <span className="text-slate-700">
+                Accompagnement par AURAX
+              </span>
+            </div>
+
+          </div>
+
+        </div>
+
         <p className="text-center text-sm leading-6 text-slate-500">
-          Aucune inscription requise • Aucune obligation d'achat • Réponse rapide.
+          Aucune inscription requise • Sans engagement • Vous serez redirigé vers WhatsApp après l'envoi.
         </p>
 
       </form>
