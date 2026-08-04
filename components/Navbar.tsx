@@ -380,7 +380,7 @@ export default function Navbar() {
               onClick={() => setMobileOpen(false)}
               className="block rounded-2xl bg-emerald-600 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-emerald-700"
             >
-              Ouvrir un espace agence
+              Rejoindre AURAX
             </Link>
 
             <Link

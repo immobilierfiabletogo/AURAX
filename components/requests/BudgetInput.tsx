@@ -12,8 +12,8 @@ interface BudgetInputProps {
 export default function BudgetInput({
   value,
   onChange,
-  label = 'Budget maximum',
-  placeholder = 'Ex : 35 000 000',
+  label = 'Budget',
+  placeholder = '...',
   required = false,
   min = 0,
 }: BudgetInputProps) {
@@ -43,7 +43,7 @@ export default function BudgetInput({
       </div>
 
       <p className="text-xs text-slate-500">
-        Indiquez votre budget maximal.
+        Indiquez votre budget.
       </p>
 
     </div>

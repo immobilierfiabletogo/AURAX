@@ -16,7 +16,7 @@ export default function DescriptionTextarea({
   value,
   onChange,
   label = 'Décrivez votre besoin',
-  placeholder = 'Ex : Je recherche une villa de 4 chambres avec garage et jardin dans le secteur d’Agoè...',
+  placeholder = 'Ex : Je recherche...',
   required = true,
   rows = 6,
   maxLength = 800,
