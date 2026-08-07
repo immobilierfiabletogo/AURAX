@@ -1,137 +1,290 @@
-"use client";
+'use client'
 
-import { useCallback, useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from 'react'
+
+import { createClient } from '@/lib/supabase/client'
 
 import {
   approveAgencyAction,
   rejectAgencyAction,
-} from "../actions/moderation";
+} from '../actions/moderation'
 
 export interface PendingAgency {
-  id: string;
-  full_name: string;
-  phone_number: string;
-  created_at: string;
+  id: string
+  full_name: string
+  phone_number: string
+  created_at: string
 
-  verification_status: string | null;
-  verified: boolean | null;
+  verification_status: string | null
+  verified: boolean | null
 
-  avatar_url: string | null;
-  website: string | null;
-  adresse: string | null;
+  avatar_url: string | null
+  website: string | null
+  adresse: string | null
 }
+
+const supabase = createClient()
 
 export function useModeration(
   showToast: (
     message: string,
-    type?: "success" | "error"
+    type?: 'success' | 'error'
   ) => void
 ) {
-  const supabase = createClient();
+  const [loading, setLoading] = useState(true)
+  const [agencies, setAgencies] =
+    useState<PendingAgency[]>([])
 
-  const [loading, setLoading] = useState(true);
-  const [agencies, setAgencies] = useState<PendingAgency[]>([]);
+  const loadPending = useCallback(
+    async (initial = false) => {
+      if (initial) {
+        setLoading(true)
+      }
 
-  const loadPending = useCallback(async () => {
-    setLoading(true);
+      const {
+        data,
+        error,
+      } = await supabase
+        .from('profiles')
+        .select(
+          `
+            id,
+            full_name,
+            phone_number,
+            created_at,
+            avatar_url,
+            website,
+            adresse,
+            verification_status,
+            verified
+          `
+        )
+        .eq('user_type', 'agence')
+        .eq(
+          'verification_status',
+          'pending'
+        )
+        .order('created_at', {
+          ascending: false,
+        })
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .select(
-        `
-          id,
-          full_name,
-          phone_number,
-          created_at,
-          avatar_url,
-          website,
-          adresse,
-          verification_status,
-          verified
-        `
-      )
-      .eq("user_type", "agence")
-      .eq("verification_status", "pending")
-      .order("created_at", {
-        ascending: false,
-      });
+      if (error) {
+        console.error(
+          'Erreur lors du chargement des agences en attente :',
+          error
+        )
 
-    if (error) {
-      console.error(
-        "Erreur lors du chargement des agences en attente :",
-        error
-      );
+        showToast(
+          'Impossible de charger les agences en attente.',
+          'error'
+        )
 
-      showToast(error.message, "error");
-      setAgencies([]);
-    } else {
-      setAgencies(data ?? []);
-    }
+        if (initial) {
+          setAgencies([])
+        }
+      } else {
+        setAgencies(
+          (data ?? []) as PendingAgency[]
+        )
+      }
 
-    setLoading(false);
-  }, [showToast, supabase]);
+      if (initial) {
+        setLoading(false)
+      }
+    },
+    [showToast]
+  )
 
+  /*
+   * APPROUVER
+   */
   const approve = useCallback(
     async (id: string) => {
-      const result = await approveAgencyAction(id);
+      const result =
+        await approveAgencyAction(id)
 
       if (result.error) {
-        showToast(result.error.message, "error");
-        return;
+        showToast(
+          result.error.message,
+          'error'
+        )
+        return
       }
 
-      showToast("Agence approuvée avec succès.", "success");
+      /*
+       * Mise à jour optimiste :
+       * on retire immédiatement l'agence
+       * de la liste sans afficher de loader.
+       */
+      setAgencies((current) =>
+        current.filter(
+          (agency) => agency.id !== id
+        )
+      )
 
-      await loadPending();
+      showToast(
+        'Agence approuvée avec succès.',
+        'success'
+      )
     },
-    [loadPending, showToast]
-  );
+    [showToast]
+  )
 
+  /*
+   * REFUSER
+   */
   const reject = useCallback(
     async (id: string) => {
-      const result = await rejectAgencyAction(id);
+      const result =
+        await rejectAgencyAction(id)
 
       if (result.error) {
-        showToast(result.error.message, "error");
-        return;
+        showToast(
+          result.error.message,
+          'error'
+        )
+        return
       }
 
-      showToast("Agence refusée.", "success");
+      setAgencies((current) =>
+        current.filter(
+          (agency) => agency.id !== id
+        )
+      )
 
-      await loadPending();
+      showToast(
+        'Agence refusée.',
+        'success'
+      )
     },
-    [loadPending, showToast]
-  );
+    [showToast]
+  )
 
+  /*
+   * CHARGEMENT INITIAL + REALTIME
+   */
   useEffect(() => {
-    loadPending();
+    void loadPending(true)
 
     const channel = supabase
-      .channel("moderation-agencies")
+      .channel('moderation-agencies')
       .on(
-        "postgres_changes",
+        'postgres_changes',
         {
-          event: "*",
-          schema: "public",
-          table: "profiles",
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
         },
-        () => {
-          loadPending();
+        (payload) => {
+          /*
+           * Nouvelle agence
+           */
+          if (
+            payload.eventType === 'INSERT'
+          ) {
+            const profile =
+              payload.new as {
+                id?: string
+                user_type?: string | null
+                verification_status?: string | null
+              }
+
+            if (
+              profile.user_type ===
+                'agence' &&
+              profile.verification_status ===
+                'pending'
+            ) {
+              void loadPending(false)
+            }
+
+            return
+          }
+
+          /*
+           * Modification d'une agence
+           */
+          if (
+            payload.eventType === 'UPDATE'
+          ) {
+            const oldProfile =
+              payload.old as {
+                id?: string
+                user_type?: string | null
+                verification_status?: string | null
+              }
+
+            const newProfile =
+              payload.new as {
+                id?: string
+                user_type?: string | null
+                verification_status?: string | null
+              }
+
+            const wasPending =
+              oldProfile.user_type ===
+                'agence' &&
+              oldProfile.verification_status ===
+                'pending'
+
+            const isPending =
+              newProfile.user_type ===
+                'agence' &&
+              newProfile.verification_status ===
+                'pending'
+
+            /*
+             * L'agence entre ou sort de la
+             * file d'attente.
+             */
+            if (
+              wasPending !== isPending
+            ) {
+              void loadPending(false)
+            }
+
+            return
+          }
+
+          /*
+           * Suppression d'un profil
+           */
+          if (
+            payload.eventType === 'DELETE'
+          ) {
+            const oldProfile =
+              payload.old as {
+                id?: string
+              }
+
+            if (oldProfile.id) {
+              setAgencies((current) =>
+                current.filter(
+                  (agency) =>
+                    agency.id !==
+                    oldProfile.id
+                )
+              )
+            }
+          }
         }
       )
-      .subscribe();
+      .subscribe()
 
     return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [loadPending, supabase]);
+      supabase.removeChannel(channel)
+    }
+  }, [loadPending])
 
   return {
     loading,
     agencies,
     approve,
     reject,
-    reload: loadPending,
-  };
+    reload: () => loadPending(false),
+  }
 }

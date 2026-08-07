@@ -1,47 +1,56 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from "@/lib/supabase/client";
-import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 
 import AdminHeader from './components/AdminHeader'
 import StatsCards from './components/StatsCards'
 import ListingsTable from './components/ListingsTable'
 import UsersTable from './components/UsersTable'
+import AgenciesTable from './components/AgenciesTable'
 import Toast from './components/Toast'
 import PaymentsTable from './components/PaymentsTable'
-import AdminRequestsTab from "./components/AdminRequestsTab";
+import AdminRequestsTab from './components/AdminRequestsTab'
+import AdminTabs, { type Tab } from './components/AdminTabs'
 
 import { useAdminListings } from './hooks/useAdminListings'
 import { useAdminUsers } from './hooks/useAdminUsers'
+import { useModeration } from './hooks/useModeration'
 import { useMonetization } from './hooks/useMonetization'
 import { usePayments } from './hooks/usePayments'
-import AdminTabs, { type Tab } from "./components/AdminTabs";
-
 
 export default function AdminPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  type AdminTab =
-  | 'stats'
-  | 'annonces'
-  | 'utilisateurs'
-  | 'paiements'
-  | 'requests'
-
-  const [tab, setTab] = useState<AdminTab>('stats')
+  const [tab, setTab] = useState<Tab>('stats')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
-  const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
-  const showToast = (text: string, type: 'success' | 'error' = 'success') => {
-    setToast({ text, type })
-    setTimeout(() => setToast(null), 4000)
-  }
+  const [toast, setToast] = useState<{
+    text: string
+    type: 'success' | 'error'
+  } | null>(null)
 
+  const showToast = useCallback(
+    (
+      text: string,
+      type: 'success' | 'error' = 'success'
+    ) => {
+      setToast({ text, type })
+
+      window.setTimeout(() => {
+        setToast(null)
+      }, 4000)
+    },
+    []
+  )
+
+  /*
+   * ANNONCES
+   */
   const {
     listings,
     loadListings,
@@ -50,9 +59,11 @@ export default function AdminPage() {
     deleteListing,
   } = useAdminListings(showToast)
 
+  /*
+   * UTILISATEURS
+   */
   const {
     users,
-    setUsers,
     loadUsers,
     editingSub,
     setEditingSub,
@@ -65,6 +76,22 @@ export default function AdminPage() {
     cancelSubscription,
   } = useAdminUsers(showToast)
 
+  /*
+   * MODÉRATION DES AGENCES
+   *
+   * Ce hook gère uniquement les agences
+   * dont verification_status = pending.
+   */
+  const {
+    loading: agenciesLoading,
+    agencies,
+    approve: approveAgency,
+    reject: rejectAgency,
+  } = useModeration(showToast)
+
+  /*
+   * MONÉTISATION
+   */
   const {
     monetizationEnabled,
     loadingToggle,
@@ -72,6 +99,9 @@ export default function AdminPage() {
     toggleMonetization,
   } = useMonetization(showToast)
 
+  /*
+   * PAIEMENTS
+   */
   const {
     payments,
     loading: paymentsLoading,
@@ -80,28 +110,46 @@ export default function AdminPage() {
     rejectPayment,
   } = usePayments(showToast)
 
+  /*
+   * INITIALISATION + SÉCURITÉ ADMIN
+   */
   useEffect(() => {
+    let mounted = true
+
     const init = async () => {
-     const {
-       data: { user },
-    } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-    if (!user) {
-      router.push('/')
-      return
-    }
+      if (!user) {
+        router.push('/')
+        return
+      }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
+      const {
+        data: profile,
+        error: profileError,
+      } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single()
 
-    if (!profile?.is_admin) {
-      router.push('/')
-      return
-    }
+      if (
+        profileError ||
+        !profile?.is_admin
+      ) {
+        router.push('/')
+        return
+      }
 
+      /*
+       * Chargement initial des données admin.
+       *
+       * IMPORTANT :
+       * Les annonces ne sont PAS filtrées par status.
+       * Elles sont déjà considérées comme publiables.
+       */
       await Promise.all([
         loadListings(),
         loadUsers(),
@@ -109,15 +157,18 @@ export default function AdminPage() {
         loadPayments(),
       ])
 
-      setLoading(false)
+      if (mounted) {
+        setLoading(false)
+      }
     }
 
     init()
-    
 
-    // Temps réel utilisateurs
+    /*
+     * REALTIME — UTILISATEURS / PROFILS
+     */
     const usersChannel = supabase
-      .channel('realtime:profiles')
+      .channel('admin-profiles')
       .on(
         'postgres_changes',
         {
@@ -125,10 +176,25 @@ export default function AdminPage() {
           schema: 'public',
           table: 'profiles',
         },
-        (payload: RealtimePostgresChangesPayload<any>) => {
-          if (payload.eventType === 'INSERT') {
-            showToast(`Nouvel utilisateur : ${payload.new.full_name}`)
-            setUnreadCount((c) => c + 1)
+        (payload) => {
+          if (
+            payload.eventType === 'INSERT'
+          ) {
+            const newUser =
+              payload.new as {
+                full_name?: string | null
+              }
+
+            showToast(
+              `Nouvel utilisateur : ${
+                newUser.full_name ??
+                'Nouvel utilisateur'
+              }`
+            )
+
+            setUnreadCount(
+              (count) => count + 1
+            )
           }
 
           loadUsers()
@@ -136,9 +202,17 @@ export default function AdminPage() {
       )
       .subscribe()
 
-    // Temps réel annonces
+    /*
+     * REALTIME — ANNONCES
+     *
+     * IMPORTANT :
+     * Aucun système "pending" ici.
+     *
+     * Toute modification d'une annonce
+     * recharge simplement la liste admin.
+     */
     const listingsChannel = supabase
-      .channel('realtime:listings')
+      .channel('admin-listings')
       .on(
         'postgres_changes',
         {
@@ -152,132 +226,302 @@ export default function AdminPage() {
       )
       .subscribe()
 
-      const paymentsChannel = supabase
-  .channel('realtime:payments')
-  .on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'payment_submissions',
-    },
-    (payload: RealtimePostgresChangesPayload<any>) => {
-      if (payload.eventType === 'INSERT') {
-        showToast('💳 Nouvelle demande de paiement')
-        setUnreadCount((c) => c + 1)
-      }
+    /*
+     * REALTIME — PAIEMENTS
+     */
+    const paymentsChannel = supabase
+      .channel('admin-payments')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'payment_submissions',
+        },
+        (payload) => {
+          if (
+            payload.eventType === 'INSERT'
+          ) {
+            showToast(
+              'Nouvelle demande de paiement'
+            )
 
-      loadPayments()
-    }
-  )
-  .subscribe()
+            setUnreadCount(
+              (count) => count + 1
+            )
+          }
+
+          loadPayments()
+        }
+      )
+      .subscribe()
+
+    /*
+     * IMPORTANT :
+     *
+     * useModeration possède déjà son propre
+     * abonnement realtime sur profiles.
+     *
+     * On ne crée donc pas un deuxième
+     * abonnement spécifique aux agences ici.
+     */
 
     return () => {
-      supabase.removeChannel(usersChannel)
-      supabase.removeChannel(listingsChannel)
-      supabase.removeChannel(paymentsChannel)
+      mounted = false
+
+      supabase.removeChannel(
+        usersChannel
+      )
+
+      supabase.removeChannel(
+        listingsChannel
+      )
+
+      supabase.removeChannel(
+        paymentsChannel
+      )
     }
   }, [])
 
+  /*
+   * CHANGEMENT D'ONGLET
+   */
+  const handleTabChange = (nextTab: Tab) => {
+    setTab(nextTab)
+    setSearch('')
+  }
 
+  /*
+   * DÉCONNEXION
+   */
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/')
   }
 
+  /*
+   * LOADING INITIAL
+   */
   if (loading) {
     return (
-      <div
+      <main
         style={{
           minHeight: '100vh',
-          background: '#0d0f14',
+          background: '#080b0f',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: '#5a5e70',
-          fontWeight: 600,
+          padding: 24,
+          color: '#697184',
+          fontFamily: 'inherit',
         }}
       >
-        Chargement de la console AURAX...
-      </div>
+        <div
+          style={{
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              width: 42,
+              height: 42,
+              margin: '0 auto 16px',
+              borderRadius: 13,
+              background:
+                'linear-gradient(135deg, #10b981, #047857)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              fontWeight: 900,
+              fontSize: 18,
+            }}
+          >
+            A
+          </div>
+
+          <div
+            style={{
+              color: '#d9dde5',
+              fontSize: 14,
+              fontWeight: 700,
+            }}
+          >
+            Chargement de la console AURAX
+          </div>
+
+          <div
+            style={{
+              marginTop: 6,
+              fontSize: 12,
+            }}
+          >
+            Vérification des accès...
+          </div>
+        </div>
+      </main>
     )
   }
 
   return (
     <>
-      <style>{`
-        * { box-sizing: border-box; }
-        body { background: #0d0f14 !important; }
-        @keyframes slideIn {
-          from {
-            transform: translateY(20px);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
+      <style jsx global>{`
+        * {
+          box-sizing: border-box;
+        }
+
+        html,
+        body {
+          margin: 0;
+          padding: 0;
+          background: #080b0f;
+        }
+
+        body {
+          min-height: 100vh;
+        }
+
+        button,
+        input {
+          font-family: inherit;
+        }
+
+        ::selection {
+          background: rgba(16, 185, 129, 0.25);
+        }
+
+        @media (max-width: 700px) {
+          .admin-container {
+            padding: 18px 14px !important;
           }
         }
       `}</style>
 
-      <div
+      <main
         style={{
           minHeight: '100vh',
-          background: '#0d0f14',
+          background:
+            'radial-gradient(circle at top right, rgba(16,185,129,0.055), transparent 30%), #080b0f',
           color: '#e8eaf0',
-          fontFamily: 'inherit',
         }}
       >
         <AdminHeader
           unreadCount={unreadCount}
-          onClearNotifs={() => setUnreadCount(0)}
-          monetizationEnabled={monetizationEnabled}
+          onClearNotifs={() =>
+            setUnreadCount(0)
+          }
+          monetizationEnabled={
+            monetizationEnabled
+          }
           loadingToggle={loadingToggle}
-          onToggleMonetization={toggleMonetization}
+          onToggleMonetization={
+            toggleMonetization
+          }
           onLogout={handleLogout}
         />
 
         <Toast message={toast} />
 
         <div
+          className="admin-container"
           style={{
-            maxWidth: 1200,
+            width: '100%',
+            maxWidth: 1380,
             margin: '0 auto',
-            padding: '28px 24px',
+            padding: '30px 24px 50px',
           }}
         >
+          {/* HEADER */}
+          <div
+            style={{
+              marginBottom: 22,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                color: '#34d399',
+                fontWeight: 800,
+                letterSpacing: '1.6px',
+                textTransform: 'uppercase',
+                marginBottom: 7,
+              }}
+            >
+              AURAX / Administration
+            </div>
+
+            <h1
+              style={{
+                margin: 0,
+                color: '#f5f7fb',
+                fontSize:
+                  'clamp(24px, 4vw, 32px)',
+                lineHeight: 1.1,
+                fontWeight: 850,
+                letterSpacing: '-0.8px',
+              }}
+            >
+              Console d’administration
+            </h1>
+
+            <p
+              style={{
+                margin: '8px 0 0',
+                color: '#697184',
+                fontSize: 13,
+              }}
+            >
+              Gérez les annonces, agences,
+              utilisateurs, paiements et
+              demandes.
+            </p>
+          </div>
+
+          {/* NAVIGATION */}
           <AdminTabs
-           tab={tab}
-          onTabChange={(t) => {
-            setTab(t)
-            setSearch('')
-          }}
-          totalAnnonces={listings.length}
-          totalUsers={users.length}
-          totalPayments={payments.length}
-        />
+            tab={tab}
+            onTabChange={handleTabChange}
+            totalAnnonces={listings.length}
+            totalAgencies={agencies.length}
+            totalUsers={users.length}
+            totalPayments={payments.length}
+          />
 
+          {/* STATISTIQUES */}
           {tab === 'stats' && (
-            <StatsCards listings={listings} users={users} />
+            <StatsCards
+              listings={listings}
+              users={users}
+            />
           )}
 
-
-
-          {tab === "requests" && (
-            <AdminRequestsTab />
-          )}
-
+          {/* ANNONCES */}
           {tab === 'annonces' && (
             <ListingsTable
               listings={listings}
               search={search}
               onSearch={setSearch}
-              onToggleActive={toggleActive}
-              onToggleBoost={toggleBoost}
+              onToggleActive={
+                toggleActive
+              }
+              onToggleBoost={
+                toggleBoost
+              }
               onDelete={deleteListing}
             />
           )}
 
+          {/* AGENCES EN ATTENTE */}
+          {tab === 'agences' && (
+            <AgenciesTable
+              agencies={agencies}
+              loading={agenciesLoading}
+              onApprove={approveAgency}
+              onReject={rejectAgency}
+            />
+          )}
+
+          {/* UTILISATEURS */}
           {tab === 'utilisateurs' && (
             <UsersTable
               users={users}
@@ -286,25 +530,47 @@ export default function AdminPage() {
               editingSub={editingSub}
               subPlan={subPlan}
               subMonths={subMonths}
-              onToggleUserType={toggleUserType}
-              onSetEditingSub={setEditingSub}
-              onSubPlanChange={setSubPlan}
-              onSubMonthsChange={setSubMonths}
-              onActivateSub={activateSubscription}
-              onCancelSub={cancelSubscription}
+              onToggleUserType={
+                toggleUserType
+              }
+              onSetEditingSub={
+                setEditingSub
+              }
+              onSubPlanChange={
+                setSubPlan
+              }
+              onSubMonthsChange={
+                setSubMonths
+              }
+              onActivateSub={
+                activateSubscription
+              }
+              onCancelSub={
+                cancelSubscription
+              }
             />
           )}
 
+          {/* PAIEMENTS */}
           {tab === 'paiements' && (
-           <PaymentsTable
-             payments={payments}
-             loading={paymentsLoading}
-             onApprove={approvePayment}
-             onReject={rejectPayment}
+            <PaymentsTable
+              payments={payments}
+              loading={paymentsLoading}
+              onApprove={
+                approvePayment
+              }
+              onReject={
+                rejectPayment
+              }
             />
           )}
+
+          {/* DEMANDES */}
+          {tab === 'requests' && (
+            <AdminRequestsTab />
+          )}
         </div>
-      </div>
+      </main>
     </>
   )
 }

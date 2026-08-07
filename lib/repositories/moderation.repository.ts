@@ -20,18 +20,49 @@ export class ModerationRepository {
   ) {
     const supabase = await createClient();
 
-    return supabase
+    const now = new Date().toISOString();
+
+    const { data, error } = await supabase
       .from("profiles")
       .update({
         verification_status: "approved",
         verified: true,
-        verified_at: new Date().toISOString(),
-        approved_at: new Date().toISOString(),
+        verified_at: now,
+        approved_at: now,
         verified_by: adminId,
       })
       .eq("id", agencyId)
-      .select()
-      .single();
+      .eq("user_type", "agence")
+      .select("id, full_name, verification_status")
+      .maybeSingle();
+
+    if (error) {
+      console.error(
+        "[ModerationRepository] approveAgency:",
+        error
+      );
+
+      return {
+        data: null,
+        error,
+      };
+    }
+
+    if (!data) {
+      return {
+        data: null,
+        error: {
+          message:
+            "Impossible d'approuver cette agence. Aucune ligne n'a été modifiée. Vérifiez les permissions RLS de la table profiles.",
+          code: "AGENCY_NOT_UPDATED",
+        },
+      };
+    }
+
+    return {
+      data,
+      error: null,
+    };
   }
 
   static async rejectAgency(
@@ -39,15 +70,44 @@ export class ModerationRepository {
   ) {
     const supabase = await createClient();
 
-    return supabase
+    const { data, error } = await supabase
       .from("profiles")
       .update({
         verification_status: "rejected",
         verified: false,
       })
       .eq("id", agencyId)
-      .select()
-      .single();
+      .eq("user_type", "agence")
+      .select("id, full_name, verification_status")
+      .maybeSingle();
+
+    if (error) {
+      console.error(
+        "[ModerationRepository] rejectAgency:",
+        error
+      );
+
+      return {
+        data: null,
+        error,
+      };
+    }
+
+    if (!data) {
+      return {
+        data: null,
+        error: {
+          message:
+            "Impossible de refuser cette agence. Aucune ligne n'a été modifiée. Vérifiez les permissions RLS de la table profiles.",
+          code: "AGENCY_NOT_UPDATED",
+        },
+      };
+    }
+
+    return {
+      data,
+      error: null,
+    };
   }
 
   static async getAgency(
@@ -59,6 +119,6 @@ export class ModerationRepository {
       .from("profiles")
       .select("*")
       .eq("id", agencyId)
-      .single();
+      .maybeSingle();
   }
 }
