@@ -45,7 +45,6 @@ export class ListingClientService {
         }
       )
       .eq("is_active", true)
-      .eq("status", "approved")
       .order("is_boosted", {
         ascending: false,
       })
@@ -124,19 +123,21 @@ export class ListingClientService {
 
     return supabase
       .from("profiles")
-      .select(`
-        id,
-        full_name,
-        avatar_url,
-        cover_url,
-        description,
-        phone_number,
-        website,
-        adresse,
-        plan,
-        verified,
-        created_at
-      `)
+      .select(
+        `
+          id,
+          full_name,
+          avatar_url,
+          cover_url,
+          description,
+          phone_number,
+          website,
+          adresse,
+          plan,
+          verified,
+          created_at
+        `
+      )
       .eq("id", agentId)
       .single();
   }
@@ -167,22 +168,26 @@ export class ListingClientService {
   static async getListingPage(id: string) {
     await this.incrementViews(id);
 
-    const { data: listing, error } =
-      await this.getListing(id);
+    const {
+      data: listing,
+      error,
+    } = await this.getListing(id);
 
     if (error || !listing) {
       return null;
     }
 
-    const [{ data: agency }, { data: similar }] =
-      await Promise.all([
-        this.getAgency(listing.agent_id),
-        this.getSimilar(
-          listing.transaction_type,
-          listing.property_type,
-          listing.id
-        ),
-      ]);
+    const [
+      { data: agency },
+      { data: similar },
+    ] = await Promise.all([
+      this.getAgency(listing.agent_id),
+      this.getSimilar(
+        listing.transaction_type,
+        listing.property_type,
+        listing.id
+      ),
+    ]);
 
     return {
       listing,

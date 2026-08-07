@@ -98,8 +98,7 @@ export class SubscriptionRepository {
         count: "exact",
         head: true,
       })
-      .eq("agent_id", userId)
-      .eq("status", "approved");
+      .eq("agent_id", userId);
   }
 
   static async countBoostsThisMonth(
@@ -108,6 +107,7 @@ export class SubscriptionRepository {
     const supabase = await createClient();
 
     const start = new Date();
+
     start.setDate(1);
     start.setHours(0, 0, 0, 0);
 
@@ -130,6 +130,7 @@ export class SubscriptionRepository {
     const supabase = await createClient();
 
     const start = new Date();
+
     start.setDate(1);
     start.setHours(0, 0, 0, 0);
 

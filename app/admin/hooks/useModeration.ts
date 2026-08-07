@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 import {
@@ -31,26 +31,26 @@ export function useModeration(
   const supabase = createClient();
 
   const [loading, setLoading] = useState(true);
+  const [agencies, setAgencies] = useState<PendingAgency[]>([]);
 
-  const [agencies, setAgencies] =
-    useState<PendingAgency[]>([]);
-
-  async function loadPending() {
+  const loadPending = useCallback(async () => {
     setLoading(true);
 
     const { data, error } = await supabase
       .from("profiles")
-      .select(`
-        id,
-        full_name,
-        phone_number,
-        created_at,
-        avatar_url,
-        website,
-        adresse,
-        verification_status,
-        verified
-      `)
+      .select(
+        `
+          id,
+          full_name,
+          phone_number,
+          created_at,
+          avatar_url,
+          website,
+          adresse,
+          verification_status,
+          verified
+        `
+      )
       .eq("user_type", "agence")
       .eq("verification_status", "pending")
       .order("created_at", {
@@ -58,52 +58,57 @@ export function useModeration(
       });
 
     if (error) {
+      console.error(
+        "Erreur lors du chargement des agences en attente :",
+        error
+      );
+
       showToast(error.message, "error");
+      setAgencies([]);
     } else {
       setAgencies(data ?? []);
     }
 
     setLoading(false);
-  }
+  }, [showToast, supabase]);
 
-  async function approve(id: string) {
-    const result =
-      await approveAgencyAction(id);
+  const approve = useCallback(
+    async (id: string) => {
+      const result = await approveAgencyAction(id);
 
-    if (result.error) {
-      showToast(result.error.message, "error");
-      return;
-    }
+      if (result.error) {
+        showToast(result.error.message, "error");
+        return;
+      }
 
-    showToast(
-      "Agence approuvée avec succès."
-    );
+      showToast("Agence approuvée avec succès.", "success");
 
-    loadPending();
-  }
+      await loadPending();
+    },
+    [loadPending, showToast]
+  );
 
-  async function reject(id: string) {
-    const result =
-      await rejectAgencyAction(id);
+  const reject = useCallback(
+    async (id: string) => {
+      const result = await rejectAgencyAction(id);
 
-    if (result.error) {
-      showToast(result.error.message, "error");
-      return;
-    }
+      if (result.error) {
+        showToast(result.error.message, "error");
+        return;
+      }
 
-    showToast(
-      "Agence refusée."
-    );
+      showToast("Agence refusée.", "success");
 
-    loadPending();
-  }
+      await loadPending();
+    },
+    [loadPending, showToast]
+  );
 
   useEffect(() => {
     loadPending();
 
     const channel = supabase
-      .channel("moderation")
-
+      .channel("moderation-agencies")
       .on(
         "postgres_changes",
         {
@@ -111,15 +116,16 @@ export function useModeration(
           schema: "public",
           table: "profiles",
         },
-        () => loadPending()
+        () => {
+          loadPending();
+        }
       )
-
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [loadPending, supabase]);
 
   return {
     loading,

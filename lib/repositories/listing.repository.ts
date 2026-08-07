@@ -8,7 +8,9 @@ export class ListingRepository {
     return supabase
       .from("listings")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("created_at", {
+        ascending: false,
+      });
   }
 
   static async findById(id: string) {
@@ -48,7 +50,6 @@ export class ListingRepository {
         }
       )
       .eq("is_active", true)
-      .eq("status", "approved")
       .order("is_boosted", {
         ascending: false,
       })
@@ -58,13 +59,15 @@ export class ListingRepository {
       .range(from, to);
 
     if (search.trim()) {
+      const normalizedSearch = search
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+
       query = query.ilike(
         "zone_normalized",
-        `%${search
-          .trim()
-          .toLowerCase()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")}%`
+        `%${normalizedSearch}%`
       );
     }
 
@@ -78,7 +81,8 @@ export class ListingRepository {
       listings: data ?? [],
       total: count ?? 0,
       hasMore:
-        from + (data?.length ?? 0) < (count ?? 0),
+        from + (data?.length ?? 0) <
+        (count ?? 0),
     };
   }
 
@@ -87,7 +91,8 @@ export class ListingRepository {
 
     return supabase
       .from("listings")
-      .select(`
+      .select(
+        `
         *,
         profiles!listings_agent_id_fkey (
           id,
@@ -95,9 +100,12 @@ export class ListingRepository {
           avatar_url,
           plan
         )
-      `)
+        `
+      )
       .eq("agent_id", agentId)
-      .order("created_at", { ascending: false });
+      .order("created_at", {
+        ascending: false,
+      });
   }
 
   static async create(data: {
@@ -110,12 +118,26 @@ export class ListingRepository {
     images_urls: string[];
     contact_phone: string | null;
     agent_id: string;
+    is_active?: boolean;
   }) {
     const supabase = await createClient();
 
     return supabase
       .from("listings")
-      .insert(data)
+      .insert({
+        title: data.title,
+        description: data.description,
+        price: data.price,
+        property_type: data.property_type,
+        transaction_type: data.transaction_type,
+        zone_saisie: data.zone_saisie,
+        images_urls: data.images_urls,
+        contact_phone: data.contact_phone,
+        agent_id: data.agent_id,
+
+        // Les annonces sont publiées directement.
+        is_active: true,
+      })
       .select()
       .single();
   }
@@ -205,7 +227,10 @@ export class ListingRepository {
         is_boosted: false,
         boosted_until: null,
       })
-      .lt("boosted_until", new Date().toISOString())
+      .lt(
+        "boosted_until",
+        new Date().toISOString()
+      )
       .eq("is_boosted", true);
   }
 
@@ -214,7 +239,8 @@ export class ListingRepository {
 
     return supabase
       .from("listings")
-      .select(`
+      .select(
+        `
         *,
         profiles!listings_agent_id_fkey (
           id,
@@ -222,9 +248,9 @@ export class ListingRepository {
           avatar_url,
           plan
         )
-      `)
+        `
+      )
       .eq("is_active", true)
-      .eq("status", "approved")
       .order("is_boosted", {
         ascending: false,
       })
@@ -259,7 +285,6 @@ export class ListingRepository {
         }
       )
       .eq("is_active", true)
-      .eq("status", "approved")
       .order("is_boosted", {
         ascending: false,
       })
@@ -269,12 +294,15 @@ export class ListingRepository {
       .range(from, to);
   }
 
-  static async findFeedByAgency(agentId: string) {
+  static async findFeedByAgency(
+    agentId: string
+  ) {
     const supabase = await createClient();
 
     return supabase
       .from("listings")
-      .select(`
+      .select(
+        `
         *,
         profiles!listings_agent_id_fkey (
           id,
@@ -282,7 +310,8 @@ export class ListingRepository {
           avatar_url,
           plan
         )
-      `)
+        `
+      )
       .eq("agent_id", agentId)
       .eq("is_active", true)
       .order("is_boosted", {
@@ -321,7 +350,8 @@ export class ListingRepository {
 
     return supabase
       .from("profiles")
-      .select(`
+      .select(
+        `
         id,
         full_name,
         avatar_url,
@@ -330,7 +360,8 @@ export class ListingRepository {
         website,
         adresse,
         description
-      `)
+        `
+      )
       .eq("id", agentId)
       .single();
   }
@@ -345,25 +376,41 @@ export class ListingRepository {
     return supabase
       .from("listings")
       .select("*")
-      .eq("transaction_type", transactionType)
-      .eq("property_type", propertyType)
+      .eq(
+        "transaction_type",
+        transactionType
+      )
+      .eq(
+        "property_type",
+        propertyType
+      )
       .eq("is_active", true)
       .neq("id", listingId)
+      .order("is_boosted", {
+        ascending: false,
+      })
+      .order("created_at", {
+        ascending: false,
+      })
       .limit(4);
   }
 
-  static async findAgencyStats(agentId: string) {
+  static async findAgencyStats(
+    agentId: string
+  ) {
     const supabase = await createClient();
 
     return supabase
       .from("listings")
-      .select(`
+      .select(
+        `
         id,
         views,
         whatsapp_clicks,
         is_boosted,
         created_at
-      `)
+        `
+      )
       .eq("agent_id", agentId)
       .eq("is_active", true);
   }

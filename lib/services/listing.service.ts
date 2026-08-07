@@ -13,7 +13,9 @@ export class ListingService {
     contact_phone: string | null;
     agent_id: string;
   }) {
-    const quota = await SubscriptionService.canPublish(data.agent_id);
+    const quota = await SubscriptionService.canPublish(
+      data.agent_id
+    );
 
     if (!quota.allowed) {
       return {
@@ -41,7 +43,10 @@ export class ListingService {
       };
     }
 
-    return ListingRepository.create(data);
+    return ListingRepository.create({
+      ...data,
+      is_active: true,
+    });
   }
 
   static async findAll() {
@@ -104,13 +109,16 @@ export class ListingService {
     }
 
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 3);
+    expiresAt.setDate(
+      expiresAt.getDate() + 3
+    );
 
     const history =
       await ListingRepository.createBoost({
         listing_id: listingId,
         profile_id: profileId,
-        expires_at: expiresAt.toISOString(),
+        expires_at:
+          expiresAt.toISOString(),
       });
 
     if (history.error) {
@@ -137,15 +145,19 @@ export class ListingService {
       return null;
     }
 
-    const [{ data: agency }, { data: similar }] =
-      await Promise.all([
-        ListingRepository.findAgent(listing.agent_id),
-        ListingRepository.findSimilar(
-          listing.transaction_type,
-          listing.property_type,
-          listing.id
-        ),
-      ]);
+    const [
+      { data: agency },
+      { data: similar },
+    ] = await Promise.all([
+      ListingRepository.findAgent(
+        listing.agent_id
+      ),
+      ListingRepository.findSimilar(
+        listing.transaction_type,
+        listing.property_type,
+        listing.id
+      ),
+    ]);
 
     return {
       listing,
