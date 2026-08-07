@@ -1,99 +1,156 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from "@/lib/supabase/client";
-import type { PaymentSubmission } from "@/types";
+
+import { createClient } from '@/lib/supabase/client'
+import type { PaymentSubmission } from '@/types'
 
 import {
   approvePaymentAction,
   rejectPaymentAction,
-} from "@/app/admin/actions";
+} from "@/app/admin/actions/payments";
 
-const ITEMS_PER_PAGE = 50;
+const ITEMS_PER_PAGE = 50
+
+type PlanCode = 'pro' | 'premium'
 
 export function usePayments(
-  showToast: (text: string, type?: 'success' | 'error') => void
+  showToast: (
+    text: string,
+    type?: 'success' | 'error'
+  ) => void
 ) {
-  const supabase = createClient();
+  const supabase = createClient()
 
   const [payments, setPayments] =
-    useState<PaymentSubmission[]>([]);
+    useState<PaymentSubmission[]>([])
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] =
+    useState(false)
 
   const loadPayments = async () => {
-    setLoading(true);
+    setLoading(true)
 
-    const { data, error } = await supabase
-      .from("payment_submissions")
-      .select(`
-        *,
-        profiles(
-          full_name,
-          phone_number
+    const { data, error } =
+      await supabase
+        .from('payment_submissions')
+        .select(`
+          *,
+          profiles!payment_submissions_agent_id_fkey(
+            full_name,
+            phone_number
+          )
+        `)
+        .order('created_at', {
+          ascending: false,
+        })
+        .range(
+          0,
+          ITEMS_PER_PAGE - 1
         )
-      `)
-      .order("created_at", { ascending: false })
-      .range(0, ITEMS_PER_PAGE - 1);
 
     if (error) {
-      showToast(error.message, "error");
-    } else {
-      setPayments(data ?? []);
+      console.error(
+        'Erreur chargement paiements :',
+        error
+      )
+
+      showToast(
+        error.message,
+        'error'
+      )
+
+      setLoading(false)
+      return
     }
 
-    setLoading(false);
-  };
+    /*
+     * Supabase peut retourner un type relationnel
+     * différent du type généré PaymentSubmission.
+     *
+     * Le résultat est donc converti explicitement
+     * ici afin de conserver un seul type dans le hook.
+     */
+    setPayments(
+      (data ?? []) as unknown as PaymentSubmission[]
+    )
+
+    setLoading(false)
+  }
 
   const approvePayment = async (
     payment: PaymentSubmission
   ) => {
-    setLoading(true);
+    setLoading(true)
 
-    const result = await approvePaymentAction(
-      payment.id,
-      payment.agent_id,
-      payment.plan_requested as
-        | "free"
-        | "pro"
-        | "premium",
-      payment.months_requested
-    );
+    const plan =
+      payment.plan_requested as PlanCode
 
-    if (result?.error) {
-      showToast(result.error.message, "error");
-    } else {
+    if (
+      plan !== 'pro' &&
+      plan !== 'premium'
+    ) {
       showToast(
-        "Abonnement activé avec succès."
-      );
+        "Plan d'abonnement invalide.",
+        'error'
+      )
 
-      await loadPayments();
+      setLoading(false)
+      return
     }
 
-    setLoading(false);
-  };
+    const result =
+      await approvePaymentAction(
+        payment.id,
+        payment.agent_id,
+        plan,
+        payment.months_requested
+      )
+
+    if (result?.error) {
+      showToast(
+        result.error.message,
+        'error'
+      )
+    } else {
+      showToast(
+        'Abonnement activé avec succès.',
+        'success'
+      )
+
+      await loadPayments()
+    }
+
+    setLoading(false)
+  }
 
   const rejectPayment = async (
     payment: PaymentSubmission
   ) => {
-    setLoading(true);
+    setLoading(true)
 
     const result =
-  await rejectPaymentAction(
-    payment.id,
-    payment.agent_id
-  );
+      await rejectPaymentAction(
+        payment.id,
+        payment.agent_id
+      )
 
     if (result?.error) {
-      showToast(result.error.message, "error");
+      showToast(
+        result.error.message,
+        'error'
+      )
     } else {
-      showToast("Paiement refusé.");
+      showToast(
+        'Paiement refusé.',
+        'success'
+      )
 
-      await loadPayments();
+      await loadPayments()
     }
 
-    setLoading(false);
-  };
+    setLoading(false)
+  }
 
   return {
     payments,
@@ -102,5 +159,5 @@ export function usePayments(
     loadPayments,
     approvePayment,
     rejectPayment,
-  };
+  }
 }

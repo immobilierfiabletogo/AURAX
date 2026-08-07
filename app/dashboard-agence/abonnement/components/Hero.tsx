@@ -2,15 +2,29 @@
 
 import { Crown, Sparkles } from 'lucide-react'
 
+type PlanCode = 'pro' | 'premium'
+
 interface HeroProps {
   agenceName: string
-  currentPlan: string
+  currentPlan: PlanCode | null
 }
 
 export default function Hero({
   agenceName,
   currentPlan,
 }: HeroProps) {
+  const planLabel =
+    currentPlan === 'premium'
+      ? 'PREMIUM'
+      : currentPlan === 'pro'
+        ? 'PRO'
+        : 'AUCUN'
+
+  const planDescription =
+    currentPlan
+      ? 'Abonnement actuellement actif'
+      : 'Choisissez votre abonnement pour commencer'
+
   return (
     <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-8 text-white shadow-xl">
 
@@ -29,17 +43,13 @@ export default function Hero({
           </div>
 
           <h1 className="text-4xl font-black">
-
             Développez votre agence
-
           </h1>
 
           <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
-
             Choisissez un abonnement adapté à votre activité,
             améliorez votre visibilité et obtenez davantage de
             contacts qualifiés grâce à la plateforme AURAX.
-
           </p>
 
         </div>
@@ -47,9 +57,7 @@ export default function Hero({
         <div className="rounded-3xl bg-white/5 p-6 backdrop-blur">
 
           <div className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">
-
             Plan actuel
-
           </div>
 
           <div className="flex items-center gap-3">
@@ -63,15 +71,15 @@ export default function Hero({
             <div>
 
               <p className="text-2xl font-black">
-
-                {currentPlan.toUpperCase()}
-
+                {planLabel}
               </p>
 
               <p className="text-sm text-slate-400">
-
                 {agenceName}
+              </p>
 
+              <p className="mt-1 text-xs text-slate-500">
+                {planDescription}
               </p>
 
             </div>

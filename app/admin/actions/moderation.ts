@@ -1,8 +1,8 @@
-'use server'
+"use server";
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { PaymentService } from "@/lib/services/payment.service";
+import { ModerationService } from "@/lib/services/moderation.service";
 
 async function ensureAdmin() {
   const supabase = await createClient();
@@ -28,45 +28,38 @@ async function ensureAdmin() {
   return user;
 }
 
-export async function approvePaymentAction(
-  paymentId: string,
-  agentId: string,
-  plan: "pro" | "premium",
-  months: number
+export async function approveAgencyAction(
+  agencyId: string
 ) {
-  await ensureAdmin();
+  const admin = await ensureAdmin();
 
-  const result = await PaymentService.approve(
-    paymentId,
-    agentId,
-    plan,
-    months
-  );
+  const result =
+    await ModerationService.approveAgency(
+      agencyId,
+      admin.id
+    );
 
   if (!result.error) {
     revalidatePath("/admin");
-    revalidatePath("/dashboard-agence");
-    revalidatePath("/mon-espace");
+    revalidatePath("/admin/moderation");
   }
 
   return result;
 }
 
-export async function rejectPaymentAction(
-  paymentId: string,
-  agentId: string
+export async function rejectAgencyAction(
+  agencyId: string
 ) {
   await ensureAdmin();
 
-  const result = await PaymentService.reject(
-    paymentId,
-    agentId
-  );
+  const result =
+    await ModerationService.rejectAgency(
+      agencyId
+    );
 
   if (!result.error) {
     revalidatePath("/admin");
-    revalidatePath("/dashboard-agence");
-    revalidatePath("/mon-espace");
+    revalidatePath("/admin/moderation");
   }
 
   return result;

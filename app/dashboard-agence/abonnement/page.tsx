@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 
 import { Loader2, Crown, Zap } from 'lucide-react'
 
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from '@/lib/supabase/client'
 
 import Hero from './components/Hero'
 import Stepper from './components/Stepper'
@@ -36,23 +36,24 @@ const DUREES = [
 const MOYENS_PAIEMENT = [
   {
     id: 'Moov',
-    name: 'Moov money',
+    name: 'Moov Money',
     number: '+228 XX XX XX XX',
     logo: 'M',
   },
   {
     id: 'Yas',
-    name: 'Mix by yas',
+    name: 'Mix by Yas',
     number: '+228 XX XX XX XX',
     logo: 'Y',
   },
 ]
 
+type PlanCode = 'pro' | 'premium'
+
 type Step = 'plans' | 'checkout' | 'confirm'
 
 export default function AbonnementPage() {
   const router = useRouter()
-
   const supabase = createClient()
 
   const {
@@ -65,7 +66,7 @@ export default function AbonnementPage() {
   const [agenceName, setAgenceName] = useState('')
 
   const [currentPlan, setCurrentPlan] =
-    useState('free')
+    useState<PlanCode | null>(null)
 
   const [step, setStep] =
     useState<Step>('plans')
@@ -86,13 +87,15 @@ export default function AbonnementPage() {
     useState(false)
 
   const [paymentProof, setPaymentProof] =
-  useState<File | null>(null)
+    useState<File | null>(null)
 
   useEffect(() => {
     loadProfile()
   }, [])
 
   async function loadProfile() {
+    setLoading(true)
+
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -102,27 +105,43 @@ export default function AbonnementPage() {
       return
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select(
-        'full_name,user_type,plan'
-      )
-      .eq('id', user.id)
-      .single()
+    const { data: profile, error } =
+      await supabase
+        .from('profiles')
+        .select(
+          'full_name,user_type,plan,subscription_status'
+        )
+        .eq('id', user.id)
+        .single()
 
-    if (profile?.user_type !== 'agence') {
+    if (error || !profile) {
+      setLoading(false)
+      return
+    }
+
+    if (profile.user_type !== 'agence') {
       router.push('/mon-espace')
       return
     }
 
     setAgenceName(profile.full_name ?? '')
-    setCurrentPlan(profile.plan ?? 'free')
+
+    if (
+      profile.plan === 'pro' ||
+      profile.plan === 'premium'
+    ) {
+      setCurrentPlan(profile.plan)
+    } else {
+      setCurrentPlan(null)
+    }
 
     setLoading(false)
   }
 
   function getTotal() {
-    if (!selectedPlan) return 0
+    if (!selectedPlan) {
+      return 0
+    }
 
     let total =
       selectedPlan.monthly_price *
@@ -152,68 +171,134 @@ export default function AbonnementPage() {
     }, 2000)
   }
 
-    async function handleSendConfirmation() {
-  if (!paymentProof) return
+  async function handleSendConfirmation() {
+    if (!paymentProof || !selectedPlan) {
+      return
+    }
 
-  setSending(true)
+    if (
+      selectedPlan.code !== 'pro' &&
+      selectedPlan.code !== 'premium'
+    ) {
+      alert('Plan invalide.')
+      return
+    }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    setSending(true)
 
-  if (!user) {
-    setSending(false)
-    return
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        router.push('/login')
+        return
+      }
+
+      const fileName =
+        `${user.id}-${Date.now()}-${paymentProof.name}`
+
+      const {
+        error: uploadError,
+      } = await supabase.storage
+        .from('payment-proofs')
+        .upload(
+          fileName,
+          paymentProof,
+          {
+            cacheControl: '3600',
+            upsert: false,
+          }
+        )
+
+      if (uploadError) {
+        console.error(
+          'Erreur upload preuve :',
+          uploadError
+        )
+
+        alert(
+          "Impossible d'envoyer la preuve de paiement."
+        )
+
+        return
+      }
+
+      const {
+        data: publicUrlData,
+      } = supabase.storage
+        .from('payment-proofs')
+        .getPublicUrl(fileName)
+
+      const screenshotUrl =
+        publicUrlData.publicUrl
+
+      const {
+        error: submissionError,
+      } = await supabase
+        .from('payment_submissions')
+        .insert({
+          agent_id: user.id,
+          plan_requested: selectedPlan.code,
+          months_requested:
+            selectedDuree.months,
+          amount: getTotal(),
+          reseau_paiement:
+            selectedMoyen.id,
+          screenshot_url:
+            screenshotUrl,
+          status: 'pending',
+        })
+
+      if (submissionError) {
+        console.error(
+          'Erreur création paiement :',
+          submissionError
+        )
+
+        alert(
+          "La preuve a été envoyée, mais la demande de paiement n'a pas pu être enregistrée. Veuillez réessayer."
+        )
+
+        return
+      }
+
+      setStep('confirm')
+    } catch (error) {
+      console.error(
+        alert(
+          `Une erreur est survenue lors de l'envoi de votre preuve de paiement.`
+        ),
+        error
+      )
+
+      alert(
+        "Une erreur est survenue lors de l'envoi de votre preuve de paiement."
+      )
+    } finally {
+      setSending(false)
+    }
   }
-
-  const fileName = `${user.id}-${Date.now()}-${paymentProof.name}`
-
-  const { error: uploadError } = await supabase.storage
-    .from('payment-proofs')
-    .upload(fileName, paymentProof)
-
-  if (uploadError) {
-    alert("Impossible d'envoyer la preuve de paiement.")
-    setSending(false)
-    return
-  }
-
-  const {
-    data: { publicUrl },
-  } = supabase.storage
-    .from('payment-proofs')
-    .getPublicUrl(fileName)
-
-  await supabase
-    .from('payment_submissions')
-    .insert({
-      agent_id: user.id,
-      plan_requested: selectedPlan.code,
-      months_requested: selectedDuree.months,
-      amount: getTotal(),
-      reseau_paiement: selectedMoyen.id,
-      screenshot_url: publicUrl,
-      status: 'pending',
-    })
-
-  setSending(false)
-
-  setStep('confirm')
-}
 
   if (loading || loadingPlans) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f7f7f5]">
-      <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-    </div>
-  )
-}
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f7f7f5]">
+        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+      </div>
+    )
+  }
+
   if (step === 'plans') {
+    const availablePlans = plans.filter(
+      (plan) =>
+        plan.code === 'pro' ||
+        plan.code === 'premium'
+    )
+
     return (
       <div className="min-h-screen bg-[#f7f7f5]">
-
         <div className="mx-auto max-w-7xl px-4 py-8">
-
           <Hero
             agenceName={agenceName}
             currentPlan={currentPlan}
@@ -224,83 +309,84 @@ export default function AbonnementPage() {
           </div>
 
           <div className="mt-10 grid gap-6 md:grid-cols-2">
-
-            {plans
-              .filter((plan) => plan.code !== 'free')
-              .map((plan) => (
-                <PlanCard
-                  key={plan.id}
-                  plan={{
+            {availablePlans.map((plan) => (
+              <PlanCard
+                key={plan.id}
+                plan={{
                   ...plan,
 
-                  icon: plan.code === 'premium' ? Crown : Zap,
+                  icon:
+                    plan.code === 'premium'
+                      ? Crown
+                      : Zap,
 
                   badge:
-  plan.code === 'premium'
-    ? 'PREMIUM'
-    : null,
+                    plan.code === 'premium'
+                      ? 'PREMIUM'
+                      : null,
 
-color:
-  plan.code === 'premium'
-    ? '#D4AF37'
-    : '#2ECC71',
+                  color:
+                    plan.code === 'premium'
+                      ? '#D4AF37'
+                      : '#2ECC71',
 
-bg:
-  plan.code === 'premium'
-    ? 'linear-gradient(180deg,#111827 0%,#1F2937 100%)'
-    : 'rgba(46,204,113,.06)',
+                  bg:
+                    plan.code === 'premium'
+                      ? 'linear-gradient(180deg,#111827 0%,#1F2937 100%)'
+                      : 'rgba(46,204,113,.06)',
 
-border:
-  plan.code === 'premium'
-    ? 'rgba(212,175,55,.35)'
-    : 'rgba(46,204,113,.25)',
+                  border:
+                    plan.code === 'premium'
+                      ? 'rgba(212,175,55,.35)'
+                      : 'rgba(46,204,113,.25)',
                 }}
-                 onSelect={() => {
-                    setSelectedPlan({
-                      ...plan,
+                onSelect={() => {
+                  setSelectedPlan({
+                    ...plan,
 
-                      icon: plan.code === 'premium' ? Crown : Zap,
+                    icon:
+                      plan.code === 'premium'
+                        ? Crown
+                        : Zap,
 
-                      badge:
-  plan.code === 'premium'
-    ? 'PREMIUM'
-    : null,
+                    badge:
+                      plan.code === 'premium'
+                        ? 'PREMIUM'
+                        : null,
 
-color:
-  plan.code === 'premium'
-    ? '#D4AF37'
-    : '#2ECC71',
+                    color:
+                      plan.code === 'premium'
+                        ? '#D4AF37'
+                        : '#2ECC71',
 
-bg:
-  plan.code === 'premium'
-    ? 'linear-gradient(180deg,#111827 0%,#1F2937 100%)'
-    : 'rgba(46,204,113,.06)',
+                    bg:
+                      plan.code === 'premium'
+                        ? 'linear-gradient(180deg,#111827 0%,#1F2937 100%)'
+                        : 'rgba(46,204,113,.06)',
 
-border:
-  plan.code === 'premium'
-    ? 'rgba(212,175,55,.35)'
-    : 'rgba(46,204,113,.25)',
-                   })
+                    border:
+                      plan.code === 'premium'
+                        ? 'rgba(212,175,55,.35)'
+                        : 'rgba(46,204,113,.25)',
+                  })
 
-                   setStep('checkout')
-                 }}
-               />
-             ))}
-
+                  setStep('checkout')
+                }}
+              />
+            ))}
           </div>
-
         </div>
-
       </div>
     )
   }
 
-    if (step === 'checkout' && selectedPlan) {
+  if (
+    step === 'checkout' &&
+    selectedPlan
+  ) {
     return (
       <div className="min-h-screen bg-[#f7f7f5]">
-
         <div className="mx-auto max-w-5xl px-4 py-8">
-
           <Hero
             agenceName={agenceName}
             currentPlan={currentPlan}
@@ -311,23 +397,28 @@ border:
           </div>
 
           <div className="mt-10">
-
             <CheckoutCard
               plan={selectedPlan}
 
               durees={DUREES}
               selectedDuree={selectedDuree}
-              setSelectedDuree={setSelectedDuree}
+              setSelectedDuree={
+                setSelectedDuree
+              }
 
               moyens={MOYENS_PAIEMENT}
               selectedMoyen={selectedMoyen}
-              setSelectedMoyen={setSelectedMoyen}
+              setSelectedMoyen={
+                setSelectedMoyen
+              }
 
               copied={copied}
               onCopy={copyNumber}
 
               paymentProof={paymentProof}
-              setPaymentProof={setPaymentProof}
+              setPaymentProof={
+                setPaymentProof
+              }
 
               total={getTotal()}
 
@@ -337,17 +428,17 @@ border:
                 setStep('plans')
               }}
 
-              onConfirm={handleSendConfirmation}
+              onConfirm={
+                handleSendConfirmation
+              }
             />
-
           </div>
-
         </div>
-
       </div>
     )
   }
-    return (
+
+  return (
     <ConfirmationCard
       plan={selectedPlan}
       duree={selectedDuree}

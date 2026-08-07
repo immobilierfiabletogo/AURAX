@@ -1,20 +1,29 @@
 import { SubscriptionRepository } from "@/lib/repositories/subscription.repository";
 
-type PlanCode =
-  | "free"
-  | "starter"
-  | "pro"
-  | "premium";
+type PlanCode = "pro" | "premium";
 
 export class SubscriptionService {
+  /**
+   * Retourne les plans disponibles.
+   *
+   * L'architecture actuelle ne possède que :
+   * - PRO
+   * - PREMIUM
+   */
   static async getPlans() {
     return SubscriptionRepository.getPlans();
   }
 
+  /**
+   * Retourne l'abonnement actuel d'une agence.
+   */
   static async getCurrentPlan(userId: string) {
     return SubscriptionRepository.getCurrentPlan(userId);
   }
 
+  /**
+   * Active un abonnement.
+   */
   static async activatePlan(
     userId: string,
     plan: PlanCode,
@@ -23,15 +32,19 @@ export class SubscriptionService {
     return SubscriptionRepository.updatePlan(
       userId,
       plan,
-      expiresAt
+      expiresAt,
+      new Date().toISOString(),
+      new Date().toISOString()
     );
   }
 
   /**
    * Renouvelle un abonnement.
-   * Si l'abonnement est encore actif, on ajoute la durée
-   * à la date actuelle d'expiration.
-   * Sinon, on repart d'aujourd'hui.
+   *
+   * Si l'abonnement actuel est encore actif,
+   * la nouvelle durée commence à sa date d'expiration.
+   *
+   * Sinon, le nouvel abonnement commence aujourd'hui.
    */
   static async renewPlan(
     userId: string,
@@ -79,12 +92,18 @@ export class SubscriptionService {
   }
 
   /**
-   * Vérifie automatiquement si l'abonnement
-   * est expiré.
+   * Vérifie l'état réel de l'abonnement.
    *
-   * Si oui :
-   * - retour au plan gratuit
-   * - mise à jour du profil
+   * IMPORTANT :
+   * Il n'existe plus de rétrogradation vers "free".
+   *
+   * Si l'abonnement est expiré :
+   * - le plan reste PRO ou PREMIUM ;
+   * - la date d'expiration reste conservée ;
+   * - le statut retourné devient "expired".
+   *
+   * Cela permet au Dashboard de rediriger correctement
+   * l'agence vers la page d'abonnement.
    */
   static async ensureSubscriptionIsValid(
     userId: string
@@ -96,53 +115,77 @@ export class SubscriptionService {
       return null;
     }
 
-    let currentProfile = profile.data;
+    const currentProfile = profile.data;
 
+    /**
+     * Aucun abonnement valide si le plan n'est pas
+     * PRO ou PREMIUM.
+     */
     if (
-      currentProfile.plan !== "free" &&
-      currentProfile.plan_expires_at
+      currentProfile.plan !== "pro" &&
+      currentProfile.plan !== "premium"
     ) {
-      const expiresAt = new Date(
-        currentProfile.plan_expires_at
-      );
+      return {
+        ...currentProfile,
+        subscription_status: "expired",
+      };
+    }
 
-      if (expiresAt <= new Date()) {
-        await SubscriptionRepository.updatePlan(
-          userId,
-          "free",
-          null
-        );
+    /**
+     * Si aucune date d'expiration n'existe,
+     * l'abonnement ne peut pas être considéré comme actif.
+     */
+    if (!currentProfile.plan_expires_at) {
+      return {
+        ...currentProfile,
+        subscription_status: "expired",
+      };
+    }
 
-        currentProfile = {
-          ...currentProfile,
-          plan: "free",
-          plan_expires_at: null,
-        };
-      }
+    const expiresAt = new Date(
+      currentProfile.plan_expires_at
+    );
+
+    /**
+     * Abonnement expiré.
+     *
+     * On NE change PAS le plan.
+     * Il reste PRO ou PREMIUM afin de conserver
+     * l'historique et d'afficher correctement
+     * le dernier abonnement souscrit.
+     */
+    if (expiresAt <= new Date()) {
+      return {
+        ...currentProfile,
+        subscription_status: "expired",
+      };
     }
 
     return currentProfile;
   }
 
   /**
-   * Retourne toutes les informations
-   * nécessaires au Dashboard.
+   * Retourne toutes les informations nécessaires
+   * au Dashboard agence.
    */
   static async getSubscriptionStatus(
     userId: string
   ) {
     const profile =
-      await this.ensureSubscriptionIsValid(
-        userId
-      );
+      await this.ensureSubscriptionIsValid(userId);
 
     if (!profile) {
       return null;
     }
 
+    const validPlan: PlanCode =
+      profile.plan === "premium"
+        ? "premium"
+        : "pro";
+
     const plan =
       await SubscriptionRepository.getPlanByCode(
-        profile.plan ?? "free"
+        validPlan
       );
 
     const expiresAt =
@@ -154,8 +197,10 @@ export class SubscriptionService {
       remainingDays = Math.max(
         0,
         Math.ceil(
-          (new Date(expiresAt).getTime() -
-            Date.now()) /
+          (
+            new Date(expiresAt).getTime() -
+            Date.now()
+          ) /
             (1000 * 60 * 60 * 24)
         )
       );
@@ -177,318 +222,529 @@ export class SubscriptionService {
 
     return {
       profile,
+
       plan: plan.data,
+
+      startedAt:
+        profile.subscription_started_at,
+
+      approvedAt:
+        profile.approved_at,
+
       expiresAt,
+
+      subscriptionStatus:
+        profile.subscription_status,
+
+      verificationStatus:
+        profile.verification_status,
+
       remainingDays,
+
       expired:
         notificationLevel === "expired",
+
       renewalRecommended:
         remainingDays <= 7,
+
       notificationLevel,
     };
   }
 
+  /**
+   * Vérifie si l'agence peut publier une annonce.
+   */
   static async canPublish(userId: string) {
-  const profile =
-    await this.ensureSubscriptionIsValid(userId);
+    const profile =
+      await this.ensureSubscriptionIsValid(userId);
 
-  if (!profile) {
+    if (!profile) {
+      return {
+        allowed: false,
+        reason: "Profil introuvable",
+      };
+    }
+
+    if (
+      profile.subscription_status !== "active"
+    ) {
+      return {
+        allowed: false,
+        reason:
+          "Votre abonnement est expiré. Veuillez renouveler votre abonnement.",
+      };
+    }
+
+    if (
+      !profile.plan_expires_at ||
+      new Date(profile.plan_expires_at) <= new Date()
+    ) {
+      return {
+        allowed: false,
+        reason:
+          "Votre abonnement est expiré. Veuillez renouveler votre abonnement.",
+      };
+    }
+
+    const plan =
+      await SubscriptionRepository.getPlanByCode(
+        profile.plan as PlanCode
+      );
+
+    if (!plan.data) {
+      return {
+        allowed: false,
+        reason: "Plan inconnu",
+      };
+    }
+
+    const listings =
+      await SubscriptionRepository.countListings(
+        userId
+      );
+
+    const used = listings.count ?? 0;
+
+    const limit = plan.data.max_listings;
+
+    /**
+     * Protection contre une limite inexistante.
+     *
+     * Si max_listings est null, on considère
+     * qu'il n'y a pas de limite.
+     */
+    if (limit === null) {
+      return {
+        allowed: true,
+        used,
+        limit: null,
+        remaining: null,
+        percentage: 0,
+        plan: plan.data,
+      };
+    }
+
     return {
-      allowed: false,
-      reason: "Profil introuvable",
-    };
-  }
+      allowed: used < limit,
 
-  const plan =
-    await SubscriptionRepository.getPlanByCode(
-      profile.plan ?? "free"
-    );
+      used,
 
-  if (!plan.data) {
-    return {
-      allowed: false,
-      reason: "Plan inconnu",
-    };
-  }
+      limit,
 
-  const listings =
-    await SubscriptionRepository.countListings(
-      userId
-    );
+      remaining: Math.max(
+        limit - used,
+        0
+      ),
 
-  const used = listings.count ?? 0;
+      percentage:
+        limit === 0
+          ? 100
+          : Math.round(
+              (used / limit) * 100
+            ),
 
-  return {
-    allowed: used < plan.data.max_listings,
-    used,
-    limit: plan.data.max_listings,
-    remaining: Math.max(
-      plan.data.max_listings - used,
-      0
-    ),
-    percentage:
-      plan.data.max_listings === 0
-        ? 100
-        : Math.round(
-            (used /
-              plan.data.max_listings) *
-              100
-          ),
-    plan: plan.data,
-    reason:
-      used >= plan.data.max_listings
-        ? `Vous avez atteint la limite de ${plan.data.max_listings} annonces.`
-        : undefined,
-  };
-}
-
-static async canBoost(userId: string) {
-  const profile =
-    await this.ensureSubscriptionIsValid(userId);
-
-  if (!profile) {
-    return {
-      allowed: false,
-      reason: "Profil introuvable",
-    };
-  }
-
-  const plan =
-    await SubscriptionRepository.getPlanByCode(
-      profile.plan ?? "free"
-    );
-
-  if (!plan.data) {
-    return {
-      allowed: false,
-      reason: "Plan inconnu",
-    };
-  }
-
-  if (plan.data.monthly_boosts >= 999999) {
-    return {
-      allowed: true,
-      used: 0,
-      limit: Infinity,
-      remaining: Infinity,
-      percentage: 0,
-      unlimited: true,
       plan: plan.data,
+
+      reason:
+        used >= limit
+          ? `Vous avez atteint la limite de ${limit} annonces de votre abonnement ${plan.data.name}.`
+          : undefined,
     };
   }
 
-  const boosts =
-    await SubscriptionRepository.countBoostsThisMonth(
-      userId
-    );
+  /**
+   * Vérifie si l'agence peut utiliser un boost.
+   */
+  static async canBoost(userId: string) {
+    const profile =
+      await this.ensureSubscriptionIsValid(userId);
 
-  const used = boosts.count ?? 0;
+    if (!profile) {
+      return {
+        allowed: false,
+        reason: "Profil introuvable",
+      };
+    }
 
-  return {
-    allowed: used < plan.data.monthly_boosts,
-    used,
-    limit: plan.data.monthly_boosts,
-    remaining: Math.max(
-      plan.data.monthly_boosts - used,
-      0
-    ),
-    percentage:
-      plan.data.monthly_boosts === 0
-        ? 100
-        : Math.round(
-            (used /
-              plan.data.monthly_boosts) *
-              100
-          ),
-    unlimited: false,
-    plan: plan.data,
-    reason:
-      used >= plan.data.monthly_boosts
-        ? "Vous avez utilisé tous vos boosts ce mois-ci."
-        : undefined,
-  };
-}
+    if (
+      profile.subscription_status !== "active"
+    ) {
+      return {
+        allowed: false,
+        reason:
+          "Votre abonnement est expiré. Veuillez renouveler votre abonnement.",
+      };
+    }
 
-static async remainingBoosts(userId: string) {
-  return this.canBoost(userId);
-}
+    if (
+      !profile.plan_expires_at ||
+      new Date(profile.plan_expires_at) <= new Date()
+    ) {
+      return {
+        allowed: false,
+        reason:
+          "Votre abonnement est expiré. Veuillez renouveler votre abonnement.",
+      };
+    }
 
-static async canUploadImages(
-  userId: string,
-  imageCount: number
-) {
-  const profile =
-    await this.ensureSubscriptionIsValid(userId);
+    const plan =
+      await SubscriptionRepository.getPlanByCode(
+        profile.plan as PlanCode
+      );
 
-  if (!profile) {
+    if (!plan.data) {
+      return {
+        allowed: false,
+        reason: "Plan inconnu",
+      };
+    }
+
+    /**
+     * Une valeur très élevée représente
+     * un nombre de boosts illimité.
+     */
+    if (
+      plan.data.monthly_boosts >= 999999
+    ) {
+      return {
+        allowed: true,
+
+        used: 0,
+
+        limit: Infinity,
+
+        remaining: Infinity,
+
+        percentage: 0,
+
+        unlimited: true,
+
+        plan: plan.data,
+      };
+    }
+
+    const boosts =
+      await SubscriptionRepository.countBoostsThisMonth(
+        userId
+      );
+
+    const used = boosts.count ?? 0;
+
+    const limit =
+      plan.data.monthly_boosts;
+
     return {
-      allowed: false,
-      reason: "Profil introuvable",
+      allowed: used < limit,
+
+      used,
+
+      limit,
+
+      remaining: Math.max(
+        limit - used,
+        0
+      ),
+
+      percentage:
+        limit === 0
+          ? 100
+          : Math.round(
+              (used / limit) * 100
+            ),
+
+      unlimited: false,
+
+      plan: plan.data,
+
+      reason:
+        used >= limit
+          ? "Vous avez utilisé tous vos boosts ce mois-ci."
+          : undefined,
     };
   }
 
-  const plan =
-    await SubscriptionRepository.getPlanByCode(
-      profile.plan ?? "free"
-    );
+  /**
+   * Alias utilisé par certaines parties
+   * de l'application.
+   */
+  static async remainingBoosts(
+    userId: string
+  ) {
+    return this.canBoost(userId);
+  }
 
-  if (!plan.data) {
+  /**
+   * Vérifie si l'agence peut uploader
+   * un nombre donné d'images.
+   */
+  static async canUploadImages(
+    userId: string,
+    imageCount: number
+  ) {
+    const profile =
+      await this.ensureSubscriptionIsValid(userId);
+
+    if (!profile) {
+      return {
+        allowed: false,
+        reason: "Profil introuvable",
+      };
+    }
+
+    if (
+      profile.subscription_status !== "active"
+    ) {
+      return {
+        allowed: false,
+        reason:
+          "Votre abonnement est expiré. Veuillez renouveler votre abonnement.",
+      };
+    }
+
+    if (
+      !profile.plan_expires_at ||
+      new Date(profile.plan_expires_at) <= new Date()
+    ) {
+      return {
+        allowed: false,
+        reason:
+          "Votre abonnement est expiré. Veuillez renouveler votre abonnement.",
+      };
+    }
+
+    const plan =
+      await SubscriptionRepository.getPlanByCode(
+        profile.plan as PlanCode
+      );
+
+    if (!plan.data) {
+      return {
+        allowed: false,
+        reason: "Plan inconnu",
+      };
+    }
+
+    const limit =
+      plan.data.max_images;
+
     return {
-      allowed: false,
-      reason: "Plan inconnu",
+      allowed:
+        imageCount <= limit,
+
+      requested:
+        imageCount,
+
+      limit,
+
+      remaining: Math.max(
+        limit - imageCount,
+        0
+      ),
+
+      plan: plan.data,
+
+      reason:
+        imageCount > limit
+          ? `Votre abonnement ${plan.data.name} autorise ${limit} images maximum par annonce.`
+          : undefined,
     };
   }
 
-  return {
-    allowed:
-      imageCount <= plan.data.max_images,
-    requested: imageCount,
-    limit: plan.data.max_images,
-    remaining: Math.max(
-      plan.data.max_images - imageCount,
-      0
-    ),
-    plan: plan.data,
-    reason:
-      imageCount > plan.data.max_images
-        ? `Votre abonnement ${plan.data.name} autorise ${plan.data.max_images} images maximum par annonce.`
-        : undefined,
-  };
-}
+  /**
+   * Retourne la limite d'images
+   * de l'abonnement actuel.
+   */
+  static async remainingImages(
+    userId: string
+  ) {
+    const profile =
+      await this.ensureSubscriptionIsValid(userId);
 
-static async remainingImages(
-  userId: string
-) {
-  const profile =
-    await this.ensureSubscriptionIsValid(userId);
+    if (!profile) {
+      return null;
+    }
 
-  if (!profile) {
-    return null;
+    if (
+      profile.subscription_status !== "active"
+    ) {
+      return null;
+    }
+
+    if (
+      !profile.plan_expires_at ||
+      new Date(profile.plan_expires_at) <= new Date()
+    ) {
+      return null;
+    }
+
+    const plan =
+      await SubscriptionRepository.getPlanByCode(
+        profile.plan as PlanCode
+      );
+
+    if (!plan.data) {
+      return null;
+    }
+
+    return {
+      limit:
+        plan.data.max_images,
+
+      plan:
+        plan.data,
+    };
   }
 
-  const plan =
-    await SubscriptionRepository.getPlanByCode(
-      profile.plan ?? "free"
-    );
+  /**
+   * Retourne toutes les informations nécessaires
+   au Dashboard agence.
+   */
+  static async getDashboardSubscription(
+    userId: string
+  ) {
+    const [
+      status,
+      publication,
+      boosts,
+      images,
+      premier,
+    ] = await Promise.all([
+      this.getSubscriptionStatus(userId),
 
-  if (!plan.data) {
-    return null;
+      this.canPublish(userId),
+
+      this.canBoost(userId),
+
+      this.remainingImages(userId),
+
+      this.getPremierSubscription(userId),
+    ]);
+
+    if (!status) {
+      return null;
+    }
+
+    return {
+      status,
+
+      publication,
+
+      boosts,
+
+      images,
+
+      premier,
+
+      plan:
+        status.plan,
+
+      expiresAt:
+        status.expiresAt,
+
+      remainingDays:
+        status.remainingDays,
+
+      expired:
+        status.expired,
+
+      renewalRecommended:
+        status.renewalRecommended,
+
+      notificationLevel:
+        status.notificationLevel,
+
+      startedAt:
+        status.startedAt,
+
+      approvedAt:
+        status.approvedAt,
+
+      subscriptionStatus:
+        status.subscriptionStatus,
+
+      verificationStatus:
+        status.verificationStatus,
+    };
   }
 
-  return {
-    limit: plan.data.max_images,
-    plan: plan.data,
-  };
-}
+  /**
+   * Gestion de l'offre PREMIER.
+   *
+   * PRO :
+   * 20 demandes / mois
+   *
+   * PREMIUM :
+   * demandes illimitées
+   */
+  static async getPremierSubscription(
+    userId: string
+  ) {
+    const [
+      profile,
+      leads,
+    ] = await Promise.all([
+      SubscriptionRepository.getProfile(
+        userId
+      ),
 
-static async getDashboardSubscription(
-  userId: string
-) {
-  const [
-    status,
-    publication,
-    boosts,
-    images,
-    premier,
-  ] = await Promise.all([
-    this.getSubscriptionStatus(userId),
-    this.canPublish(userId),
-    this.canBoost(userId),
-    this.remainingImages(userId),
-    this.getPremierSubscription(userId),
-  ]);
+      SubscriptionRepository.countClaimedRequestsThisMonth(
+        userId
+      ),
+    ]);
 
-  if (!status) {
-    return null;
+    if (!profile.data) {
+      return null;
+    }
+
+    const subscription =
+      await SubscriptionRepository.getCurrentPlan(
+        userId
+      );
+
+    const plan: PlanCode =
+      subscription.data?.plan === "premium"
+        ? "premium"
+        : "pro";
+
+    const limits: Record<
+      PlanCode,
+      number
+    > = {
+      pro: 20,
+
+      premium:
+        Number.POSITIVE_INFINITY,
+    };
+
+    const leadLimit =
+      limits[plan];
+
+    const leadsUsed =
+      leads.count ?? 0;
+
+    return {
+      subscription:
+        subscription.data,
+
+      plan,
+
+      leadLimit,
+
+      leadsUsed,
+
+      remainingCredits:
+        leadLimit ===
+        Number.POSITIVE_INFINITY
+          ? Number.POSITIVE_INFINITY
+          : Math.max(
+              0,
+              leadLimit -
+                leadsUsed
+            ),
+
+      unlimited:
+        leadLimit ===
+        Number.POSITIVE_INFINITY,
+    };
   }
-
-  return {
-    status,
-    publication,
-    boosts,
-    images,
-    premier,
-
-    plan: status.plan,
-    expiresAt: status.expiresAt,
-    remainingDays: status.remainingDays,
-
-    expired: status.expired,
-
-    renewalRecommended:
-      status.renewalRecommended,
-
-    notificationLevel:
-      status.notificationLevel,
-  };
-}
-
-
-static async getPremierSubscription(
-  userId: string
-) {
-  const [
-    profile,
-    leads,
-  ] = await Promise.all([
-    SubscriptionRepository.getProfile(userId),
-
-    SubscriptionRepository.countClaimedRequestsThisMonth(
-      userId
-    ),
-  ]);
-
-  if (!profile.data) {
-    return null;
-  }
-
-  const subscription =
-    await SubscriptionRepository.getCurrentPlan(
-      userId
-    );
-
-  const plan =
-    subscription.data?.plan ?? "free";
-
-  const limits: Record<
-    string,
-    number
-  > = {
-    free: 0,
-    starter: 10,
-    pro: 50,
-    premium: Number.POSITIVE_INFINITY,
-  };
-
-  const leadLimit =
-    limits[plan] ?? 0;
-
-  const leadsUsed =
-    leads.count ?? 0;
-
-  return {
-    subscription:
-      subscription.data,
-
-    plan,
-
-    leadLimit,
-
-    leadsUsed,
-
-    remainingCredits:
-      leadLimit ===
-      Number.POSITIVE_INFINITY
-        ? Number.POSITIVE_INFINITY
-        : Math.max(
-            0,
-            leadLimit -
-              leadsUsed
-          ),
-
-    unlimited:
-      leadLimit ===
-      Number.POSITIVE_INFINITY,
-  };
-}
 }

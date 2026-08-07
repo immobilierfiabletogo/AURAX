@@ -1,3 +1,4 @@
+
 import { createClient } from "@/lib/supabase/server";
 
 export class PaymentRepository {
@@ -30,27 +31,10 @@ export class PaymentRepository {
   }
 
   static async approvePayment(
-    paymentId: string,
-    agentId: string,
-    plan: "free" | "pro" | "premium",
-    expiresAt: string
+    paymentId: string
   ) {
     const supabase = await createClient();
 
-    // Activation de l'abonnement
-    const profile = await supabase
-      .from("profiles")
-      .update({
-        plan,
-        plan_expires_at: expiresAt,
-      })
-      .eq("id", agentId);
-
-    if (profile.error) {
-      return profile;
-    }
-
-    // Validation du paiement
     return supabase
       .from("payment_submissions")
       .update({
@@ -62,7 +46,9 @@ export class PaymentRepository {
       .single();
   }
 
-  static async rejectPayment(paymentId: string) {
+  static async rejectPayment(
+    paymentId: string
+  ) {
     const supabase = await createClient();
 
     return supabase

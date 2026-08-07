@@ -112,28 +112,22 @@ function RegisterContent() {
 
 
     const {
-      error: signUpError
-    } = await supabase.auth.signUp({
+      error: signUpError,
+     } = await supabase.auth.signUp({
+       email,
+       password,
 
-      email,
+       options: {
+         emailRedirectTo:
+           `${window.location.origin}/auth/callback`,
 
-      password,
-
-      options: {
-
-        data: {
-
-          full_name: fullName,
-
-          phone_number: phone,
-
-          user_type: userType,
-
-        },
-
-      },
-
-    })
+         data: {
+           full_name: fullName,
+           phone_number: phone,
+           user_type: userType,
+         },
+       },
+     })
 
 
 

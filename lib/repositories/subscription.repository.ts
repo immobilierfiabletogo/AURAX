@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 
+export type PlanCode = "pro" | "premium";
+
 export class SubscriptionRepository {
   static async getPlans() {
     const supabase = await createClient();
@@ -7,10 +9,11 @@ export class SubscriptionRepository {
     return supabase
       .from("subscription_plans")
       .select("*")
+      .in("code", ["pro", "premium"])
       .order("monthly_price");
   }
 
-  static async getPlanByCode(code: string) {
+  static async getPlanByCode(code: PlanCode) {
     const supabase = await createClient();
 
     return supabase
@@ -25,15 +28,24 @@ export class SubscriptionRepository {
 
     return supabase
       .from("profiles")
-      .select("plan, plan_expires_at, subscription_status")
+      .select(`
+        plan,
+        subscription_status,
+        subscription_started_at,
+        plan_expires_at,
+        approved_at,
+        verification_status
+      `)
       .eq("id", userId)
       .single();
   }
 
   static async updatePlan(
     userId: string,
-    plan: "free" | "starter" | "pro" | "premium",
-    expiresAt: string | null
+    plan: PlanCode,
+    expiresAt: string | null,
+    startedAt?: string | null,
+    approvedAt?: string | null
   ) {
     const supabase = await createClient();
 
@@ -41,7 +53,28 @@ export class SubscriptionRepository {
       .from("profiles")
       .update({
         plan,
+        subscription_status: expiresAt
+          ? "active"
+          : "expired",
+        subscription_started_at:
+          startedAt ?? new Date().toISOString(),
+        approved_at:
+          approvedAt ?? new Date().toISOString(),
         plan_expires_at: expiresAt,
+      })
+      .eq("id", userId);
+  }
+
+  static async markSubscriptionExpired(
+    userId: string
+  ) {
+    const supabase = await createClient();
+
+    return supabase
+      .from("profiles")
+      .update({
+        subscription_status: "expired",
+        plan_expires_at: null,
       })
       .eq("id", userId);
   }
@@ -69,7 +102,9 @@ export class SubscriptionRepository {
       .eq("status", "approved");
   }
 
-  static async countBoostsThisMonth(userId: string) {
+  static async countBoostsThisMonth(
+    userId: string
+  ) {
     const supabase = await createClient();
 
     const start = new Date();
@@ -83,10 +118,15 @@ export class SubscriptionRepository {
         head: true,
       })
       .eq("profile_id", userId)
-      .gte("created_at", start.toISOString());
+      .gte(
+        "created_at",
+        start.toISOString()
+      );
   }
 
-  static async countClaimedRequestsThisMonth(userId: string) {
+  static async countClaimedRequestsThisMonth(
+    userId: string
+  ) {
     const supabase = await createClient();
 
     const start = new Date();
@@ -100,7 +140,10 @@ export class SubscriptionRepository {
         head: true,
       })
       .eq("claimed_by", userId)
-      .gte("claimed_at", start.toISOString());
+      .gte(
+        "claimed_at",
+        start.toISOString()
+      );
   }
 
   static async getAuthenticatedUser() {

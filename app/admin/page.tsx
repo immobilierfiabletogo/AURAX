@@ -17,7 +17,6 @@ import { useAdminListings } from './hooks/useAdminListings'
 import { useAdminUsers } from './hooks/useAdminUsers'
 import { useMonetization } from './hooks/useMonetization'
 import { usePayments } from './hooks/usePayments'
-import { approvePaymentAction, rejectPaymentAction,} from "./actions/payments";
 import AdminTabs, { type Tab } from "./components/AdminTabs";
 
 
@@ -172,42 +171,6 @@ export default function AdminPage() {
     }
   )
   .subscribe()
-
-  const handleApprove = async (payment: any) => {
-    const result =
-      await approvePaymentAction(
-        payment.id,
-        payment.agent_id,
-        payment.plan_requested,
-        payment.months_requested
-      );
-
-    if (result.error) {
-      showToast(result.error.message, "error");
-      return;
-    }
-
-    showToast(
-      "✅ Paiement validé et abonnement activé."
-    );
-
-    loadPayments();
-    loadUsers();
-  };
-
-  const handleReject = async (payment: any) => {
-    const result =
-      await rejectPaymentAction(payment.id, payment.agent_id);
-
-    if (result.error) {
-      showToast(result.error.message, "error");
-      return;
-    }
-
-    showToast("Paiement refusé.");
-
-    loadPayments();
-  };
 
     return () => {
       supabase.removeChannel(usersChannel)
