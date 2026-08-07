@@ -63,6 +63,7 @@ export default function AgencySidebar({
           flex
           w-72
           flex-col
+          overflow-y-auto
           overflow-hidden
           border-r
           border-white/10
@@ -111,7 +112,7 @@ export default function AgencySidebar({
         <div className="
           relative
           flex
-          h-full
+          min-h-full
           flex-col
           p-6
         ">

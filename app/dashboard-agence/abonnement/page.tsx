@@ -37,13 +37,13 @@ const MOYENS_PAIEMENT = [
   {
     id: 'Moov',
     name: 'Moov Money',
-    number: '+228 XX XX XX XX',
+    number: '+228 97 63 06 90',
     logo: 'M',
   },
   {
     id: 'Yas',
     name: 'Mix by Yas',
-    number: '+228 XX XX XX XX',
+    number: '+228 73 06 32 83',
     logo: 'Y',
   },
 ]
