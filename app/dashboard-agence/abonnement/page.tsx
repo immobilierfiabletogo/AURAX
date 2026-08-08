@@ -52,6 +52,18 @@ type PlanCode = 'pro' | 'premium'
 
 type Step = 'plans' | 'checkout' | 'confirm'
 
+type SubscriptionPlan = ReturnType<
+  typeof useSubscriptionPlans
+>['plans'][number]
+
+type SelectedPlan = SubscriptionPlan & {
+  icon: typeof Crown
+  badge: string | null
+  color: string
+  bg: string
+  border: string
+}
+
 export default function AbonnementPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -72,7 +84,7 @@ export default function AbonnementPage() {
     useState<Step>('plans')
 
   const [selectedPlan, setSelectedPlan] =
-    useState<any>(null)
+    useState<SelectedPlan | null>(null)
 
   const [selectedDuree, setSelectedDuree] =
     useState(DUREES[0])
@@ -90,23 +102,43 @@ export default function AbonnementPage() {
     useState<File | null>(null)
 
   useEffect(() => {
-    loadProfile()
-  }, [])
+    let mounted = true
 
-  async function loadProfile() {
-    setLoading(true)
+    async function loadProfile() {
+      setLoading(true)
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
 
-    if (!user) {
-      router.push('/login')
-      return
-    }
+      if (authError) {
+        console.error(
+          'Erreur récupération utilisateur :',
+          authError
+        )
 
-    const { data: profile, error } =
-      await supabase
+        if (mounted) {
+          setLoading(false)
+        }
+
+        router.push('/login')
+        return
+      }
+
+      if (!user) {
+        if (mounted) {
+          setLoading(false)
+        }
+
+        router.push('/login')
+        return
+      }
+
+      const {
+        data: profile,
+        error: profileError,
+      } = await supabase
         .from('profiles')
         .select(
           'full_name,user_type,plan,subscription_status'
@@ -114,29 +146,54 @@ export default function AbonnementPage() {
         .eq('id', user.id)
         .single()
 
-    if (error || !profile) {
+      if (profileError || !profile) {
+        console.error(
+          'Erreur récupération profil :',
+          profileError
+        )
+
+        if (mounted) {
+          setLoading(false)
+        }
+
+        return
+      }
+
+      if (profile.user_type !== 'agence') {
+        if (mounted) {
+          setLoading(false)
+        }
+
+        router.push('/mon-espace')
+        return
+      }
+
+      if (!mounted) {
+        return
+      }
+
+      setAgenceName(
+        profile.full_name ?? ''
+      )
+
+      if (
+        profile.plan === 'pro' ||
+        profile.plan === 'premium'
+      ) {
+        setCurrentPlan(profile.plan)
+      } else {
+        setCurrentPlan(null)
+      }
+
       setLoading(false)
-      return
     }
 
-    if (profile.user_type !== 'agence') {
-      router.push('/mon-espace')
-      return
+    loadProfile()
+
+    return () => {
+      mounted = false
     }
-
-    setAgenceName(profile.full_name ?? '')
-
-    if (
-      profile.plan === 'pro' ||
-      profile.plan === 'premium'
-    ) {
-      setCurrentPlan(profile.plan)
-    } else {
-      setCurrentPlan(null)
-    }
-
-    setLoading(false)
-  }
+  }, [router, supabase])
 
   function getTotal() {
     if (!selectedPlan) {
@@ -148,7 +205,9 @@ export default function AbonnementPage() {
       selectedDuree.months
 
     if (selectedDuree.months === 3) {
-      total = Math.round(total * 0.95)
+      total = Math.round(
+        total * 0.95
+      )
     }
 
     if (selectedDuree.months === 12) {
@@ -159,20 +218,41 @@ export default function AbonnementPage() {
     return total
   }
 
-  function copyNumber() {
-    navigator.clipboard.writeText(
-      selectedMoyen.number
-    )
+  async function copyNumber() {
+    try {
+      await navigator.clipboard.writeText(
+        selectedMoyen.number
+      )
 
-    setCopied(true)
+      setCopied(true)
 
-    setTimeout(() => {
-      setCopied(false)
-    }, 2000)
+      window.setTimeout(() => {
+        setCopied(false)
+      }, 2000)
+    } catch (error) {
+      console.error(
+        'Impossible de copier le numéro :',
+        error
+      )
+    }
   }
 
   async function handleSendConfirmation() {
-    if (!paymentProof || !selectedPlan) {
+    if (sending) {
+      return
+    }
+
+    if (!paymentProof) {
+      alert(
+        'Veuillez sélectionner la capture de votre paiement.'
+      )
+      return
+    }
+
+    if (!selectedPlan) {
+      alert(
+        'Veuillez sélectionner un abonnement.'
+      )
       return
     }
 
@@ -184,21 +264,96 @@ export default function AbonnementPage() {
       return
     }
 
+    if (
+      !paymentProof.type.startsWith(
+        'image/'
+      )
+    ) {
+      alert(
+        'Veuillez sélectionner une image valide.'
+      )
+      return
+    }
+
+    const MAX_FILE_SIZE =
+      10 * 1024 * 1024
+
+    if (
+      paymentProof.size >
+      MAX_FILE_SIZE
+    ) {
+      alert(
+        'La capture est trop volumineuse. Taille maximale : 10 Mo.'
+      )
+      return
+    }
+
     setSending(true)
 
     try {
       const {
         data: { user },
+        error: authError,
       } = await supabase.auth.getUser()
 
-      if (!user) {
+      if (authError) {
+        console.error(
+          'Erreur authentification :',
+          authError
+        )
+
+        alert(
+          "Votre session n'est plus valide. Veuillez vous reconnecter."
+        )
+
         router.push('/login')
         return
       }
 
-      const fileName =
-        `${user.id}-${Date.now()}-${paymentProof.name}`
+      if (!user) {
+        alert(
+          'Votre session a expiré. Veuillez vous reconnecter.'
+        )
 
+        router.push('/login')
+        return
+      }
+
+      /*
+       * Nom de fichier sécurisé.
+       *
+       * Structure :
+       * payment-proofs/
+       *   user-id/
+       *     uuid.extension
+       */
+      const extension =
+        paymentProof.name
+          .split('.')
+          .pop()
+          ?.toLowerCase() || 'jpg'
+
+      const allowedExtensions = [
+        'jpg',
+        'jpeg',
+        'png',
+        'webp',
+        'gif',
+      ]
+
+      const safeExtension =
+        allowedExtensions.includes(
+          extension
+        )
+          ? extension
+          : 'jpg'
+
+      const fileName =
+        `${user.id}/${crypto.randomUUID()}.${safeExtension}`
+
+      /*
+       * UPLOAD DE LA PREUVE
+       */
       const {
         error: uploadError,
       } = await supabase.storage
@@ -208,23 +363,67 @@ export default function AbonnementPage() {
           paymentProof,
           {
             cacheControl: '3600',
+            contentType:
+              paymentProof.type,
             upsert: false,
           }
         )
 
       if (uploadError) {
         console.error(
-          'Erreur upload preuve :',
+          'Erreur upload preuve de paiement :',
           uploadError
         )
 
-        alert(
-          "Impossible d'envoyer la preuve de paiement."
-        )
+        const message =
+          uploadError.message?.toLowerCase() ??
+          ''
+
+        if (
+          message.includes(
+            'row-level security'
+          ) ||
+          message.includes(
+            'not authorized'
+          ) ||
+          message.includes(
+            'unauthorized'
+          )
+        ) {
+          alert(
+            "L'envoi de la preuve est bloqué par les permissions de stockage. Vérifiez les policies du bucket payment-proofs."
+          )
+        } else if (
+          message.includes(
+            'already exists'
+          )
+        ) {
+          alert(
+            'Cette preuve existe déjà. Veuillez sélectionner à nouveau votre capture.'
+          )
+        } else if (
+          message.includes(
+            'payload too large'
+          ) ||
+          message.includes(
+            'file size'
+          )
+        ) {
+          alert(
+            'La capture est trop volumineuse.'
+          )
+        } else {
+          alert(
+            `Impossible d'envoyer la preuve de paiement : ${uploadError.message}`
+          )
+        }
 
         return
       }
 
+      /*
+       * URL publique de la preuve
+       */
       const {
         data: publicUrlData,
       } = supabase.storage
@@ -234,13 +433,30 @@ export default function AbonnementPage() {
       const screenshotUrl =
         publicUrlData.publicUrl
 
+      if (!screenshotUrl) {
+        console.error(
+          'URL publique introuvable :',
+          fileName
+        )
+
+        alert(
+          "La preuve a été envoyée mais son URL n'a pas pu être générée."
+        )
+
+        return
+      }
+
+      /*
+       * ENREGISTREMENT DE LA DEMANDE
+       */
       const {
         error: submissionError,
       } = await supabase
         .from('payment_submissions')
         .insert({
           agent_id: user.id,
-          plan_requested: selectedPlan.code,
+          plan_requested:
+            selectedPlan.code,
           months_requested:
             selectedDuree.months,
           amount: getTotal(),
@@ -253,35 +469,51 @@ export default function AbonnementPage() {
 
       if (submissionError) {
         console.error(
-          'Erreur création paiement :',
+          'Erreur création payment_submissions :',
           submissionError
         )
 
         alert(
-          "La preuve a été envoyée, mais la demande de paiement n'a pas pu être enregistrée. Veuillez réessayer."
+          `La preuve a été envoyée, mais la demande de paiement n'a pas pu être enregistrée : ${submissionError.message}`
         )
 
         return
       }
 
+      /*
+       * Succès
+       */
+      setPaymentProof(null)
       setStep('confirm')
     } catch (error) {
       console.error(
-        alert(
-          `Une erreur est survenue lors de l'envoi de votre preuve de paiement.`
-        ),
+        "Erreur inattendue lors de l'envoi :",
         error
       )
 
-      alert(
-        "Une erreur est survenue lors de l'envoi de votre preuve de paiement."
-      )
+      if (
+        error instanceof Error
+      ) {
+        alert(
+          `Une erreur est survenue : ${error.message}`
+        )
+      } else {
+        alert(
+          "Une erreur est survenue lors de l'envoi de votre preuve de paiement."
+        )
+      }
     } finally {
       setSending(false)
     }
   }
 
-  if (loading || loadingPlans) {
+  /*
+   * LOADING
+   */
+  if (
+    loading ||
+    loadingPlans
+  ) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f7f7f5]">
         <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
@@ -289,16 +521,21 @@ export default function AbonnementPage() {
     )
   }
 
+  /*
+   * ÉTAPE 1 — PLANS
+   */
   if (step === 'plans') {
-    const availablePlans = plans.filter(
-      (plan) =>
-        plan.code === 'pro' ||
-        plan.code === 'premium'
-    )
+    const availablePlans =
+      plans.filter(
+        (plan) =>
+          plan.code === 'pro' ||
+          plan.code === 'premium'
+      )
 
     return (
       <div className="min-h-screen bg-[#f7f7f5]">
         <div className="mx-auto max-w-7xl px-4 py-8">
+
           <Hero
             agenceName={agenceName}
             currentPlan={currentPlan}
@@ -309,39 +546,12 @@ export default function AbonnementPage() {
           </div>
 
           <div className="mt-10 grid gap-6 md:grid-cols-2">
-            {availablePlans.map((plan) => (
-              <PlanCard
-                key={plan.id}
-                plan={{
-                  ...plan,
 
-                  icon:
-                    plan.code === 'premium'
-                      ? Crown
-                      : Zap,
+            {availablePlans.map(
+              (plan) => {
 
-                  badge:
-                    plan.code === 'premium'
-                      ? 'PREMIUM'
-                      : null,
-
-                  color:
-                    plan.code === 'premium'
-                      ? '#D4AF37'
-                      : '#2ECC71',
-
-                  bg:
-                    plan.code === 'premium'
-                      ? 'linear-gradient(180deg,#111827 0%,#1F2937 100%)'
-                      : 'rgba(46,204,113,.06)',
-
-                  border:
-                    plan.code === 'premium'
-                      ? 'rgba(212,175,55,.35)'
-                      : 'rgba(46,204,113,.25)',
-                }}
-                onSelect={() => {
-                  setSelectedPlan({
+                const planWithStyle: SelectedPlan =
+                  {
                     ...plan,
 
                     icon:
@@ -368,18 +578,41 @@ export default function AbonnementPage() {
                       plan.code === 'premium'
                         ? 'rgba(212,175,55,.35)'
                         : 'rgba(46,204,113,.25)',
-                  })
+                  }
 
-                  setStep('checkout')
-                }}
-              />
-            ))}
+                return (
+                  <PlanCard
+                    key={plan.id}
+                    plan={
+                      planWithStyle
+                    }
+                    onSelect={() => {
+                      setSelectedPlan(
+                        planWithStyle
+                      )
+
+                      setPaymentProof(
+                        null
+                      )
+
+                      setStep(
+                        'checkout'
+                      )
+                    }}
+                  />
+                )
+              }
+            )}
+
           </div>
         </div>
       </div>
     )
   }
 
+  /*
+   * ÉTAPE 2 — CHECKOUT
+   */
   if (
     step === 'checkout' &&
     selectedPlan
@@ -387,6 +620,7 @@ export default function AbonnementPage() {
     return (
       <div className="min-h-screen bg-[#f7f7f5]">
         <div className="mx-auto max-w-5xl px-4 py-8">
+
           <Hero
             agenceName={agenceName}
             currentPlan={currentPlan}
@@ -397,17 +631,24 @@ export default function AbonnementPage() {
           </div>
 
           <div className="mt-10">
+
             <CheckoutCard
               plan={selectedPlan}
 
               durees={DUREES}
-              selectedDuree={selectedDuree}
+              selectedDuree={
+                selectedDuree
+              }
               setSelectedDuree={
                 setSelectedDuree
               }
 
-              moyens={MOYENS_PAIEMENT}
-              selectedMoyen={selectedMoyen}
+              moyens={
+                MOYENS_PAIEMENT
+              }
+              selectedMoyen={
+                selectedMoyen
+              }
               setSelectedMoyen={
                 setSelectedMoyen
               }
@@ -415,7 +656,9 @@ export default function AbonnementPage() {
               copied={copied}
               onCopy={copyNumber}
 
-              paymentProof={paymentProof}
+              paymentProof={
+                paymentProof
+              }
               setPaymentProof={
                 setPaymentProof
               }
@@ -426,24 +669,67 @@ export default function AbonnementPage() {
 
               onBack={() => {
                 setStep('plans')
+                setPaymentProof(
+                  null
+                )
               }}
 
               onConfirm={
                 handleSendConfirmation
               }
             />
+
           </div>
         </div>
       </div>
     )
   }
 
+  /*
+   * ÉTAPE 3 — CONFIRMATION
+   *
+   * selectedPlan est vérifié avant
+   * d'être transmis à ConfirmationCard.
+   */
+  if (
+    step === 'confirm' &&
+    selectedPlan
+  ) {
+    return (
+      <ConfirmationCard
+        plan={selectedPlan}
+        duree={selectedDuree}
+        moyen={selectedMoyen}
+        total={getTotal()}
+      />
+    )
+  }
+
+  /*
+   * Sécurité :
+   * aucun état incohérent ne doit
+   * afficher une page vide.
+   */
   return (
-    <ConfirmationCard
-      plan={selectedPlan}
-      duree={selectedDuree}
-      moyen={selectedMoyen}
-      total={getTotal()}
-    />
+    <div className="flex min-h-screen items-center justify-center bg-[#f7f7f5]">
+      <div className="text-center">
+
+        <p className="text-sm font-bold text-slate-600">
+          Une erreur est survenue.
+        </p>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedPlan(null)
+            setStep('plans')
+          }}
+          className="mt-4 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
+        >
+          Retour aux abonnements
+        </button>
+
+      </div>
+    </div>
   )
 }
