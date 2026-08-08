@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { Loader2, Crown, Zap } from 'lucide-react'
@@ -15,7 +15,24 @@ import ConfirmationCard from './components/ConfirmationCard'
 
 import { useSubscriptionPlans } from './hooks/useSubscriptionPlans'
 
-const DUREES = [
+type PlanCode = 'pro' | 'premium'
+
+type Step = 'plans' | 'checkout' | 'confirm'
+
+type Duree = {
+  months: number
+  label: string
+  discount: string | null
+}
+
+type MoyenPaiement = {
+  id: string
+  name: string
+  number: string
+  logo: string
+}
+
+const DUREES: Duree[] = [
   {
     months: 1,
     label: '1 mois',
@@ -33,7 +50,7 @@ const DUREES = [
   },
 ]
 
-const MOYENS_PAIEMENT = [
+const MOYENS_PAIEMENT: MoyenPaiement[] = [
   {
     id: 'moov_money',
     name: 'Moov Money',
@@ -47,10 +64,6 @@ const MOYENS_PAIEMENT = [
     logo: 'Y',
   },
 ]
-
-type PlanCode = 'pro' | 'premium'
-
-type Step = 'plans' | 'checkout' | 'confirm'
 
 type SubscriptionPlan = ReturnType<
   typeof useSubscriptionPlans
@@ -86,11 +99,17 @@ export default function AbonnementPage() {
   const [selectedPlan, setSelectedPlan] =
     useState<SelectedPlan | null>(null)
 
+  /*
+   * IMPORTANT :
+   * On donne explicitement les types aux states.
+   */
   const [selectedDuree, setSelectedDuree] =
-    useState(DUREES[0])
+    useState<Duree>(DUREES[0])
 
   const [selectedMoyen, setSelectedMoyen] =
-    useState(MOYENS_PAIEMENT[0])
+    useState<MoyenPaiement>(
+      MOYENS_PAIEMENT[0]
+    )
 
   const [copied, setCopied] =
     useState(false)
@@ -101,100 +120,221 @@ export default function AbonnementPage() {
   const [paymentProof, setPaymentProof] =
     useState<File | null>(null)
 
+  // ... reste de ton fichier
+
+  /**
+   * Plans disponibles.
+   */
+  const availablePlans = useMemo(() => {
+    return plans.filter(
+      (plan) =>
+        plan.code === 'pro' ||
+        plan.code === 'premium'
+    )
+  }, [plans])
+
+  /**
+   * ============================================================
+   * CHARGEMENT DU PROFIL
+   * ============================================================
+   */
   useEffect(() => {
     let mounted = true
 
     async function loadProfile() {
-      setLoading(true)
+      try {
+        setLoading(true)
 
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser()
+        /**
+         * On récupère d'abord la session locale.
+         *
+         * getSession() permet de vérifier si le navigateur
+         * possède réellement une session Supabase.
+         */
+        const {
+          data: sessionData,
+          error: sessionError,
+        } = await supabase.auth.getSession()
 
-      if (authError) {
+        if (sessionError) {
+          console.error(
+            'Erreur récupération session :',
+            sessionError
+          )
+
+          if (mounted) {
+            setLoading(false)
+          }
+
+          router.replace('/login')
+          return
+        }
+
+        const session =
+          sessionData.session
+
+        /**
+         * Pas de session = utilisateur non connecté.
+         */
+        if (!session?.user) {
+          console.warn(
+            'Aucune session Supabase active.'
+          )
+
+          if (mounted) {
+            setLoading(false)
+          }
+
+          router.replace('/login')
+          return
+        }
+
+        const user =
+          session.user
+
+        /**
+         * On récupère ensuite le profil.
+         */
+        const {
+          data: profile,
+          error: profileError,
+        } = await supabase
+          .from('profiles')
+          .select(
+            `
+              full_name,
+              user_type,
+              plan,
+              subscription_status,
+              plan_expires_at
+            `
+          )
+          .eq('id', user.id)
+          .single()
+
+        if (profileError) {
+          console.error(
+            'Erreur récupération profil :',
+            profileError
+          )
+
+          if (mounted) {
+            setLoading(false)
+          }
+
+          return
+        }
+
+        if (!profile) {
+          console.error(
+            'Profil introuvable pour :',
+            user.id
+          )
+
+          if (mounted) {
+            setLoading(false)
+          }
+
+          return
+        }
+
+        /**
+         * Cette page est réservée aux agences.
+         */
+        if (
+          profile.user_type !== 'agence'
+        ) {
+          if (mounted) {
+            setLoading(false)
+          }
+
+          router.replace('/mon-espace')
+          return
+        }
+
+        if (!mounted) {
+          return
+        }
+
+        setAgenceName(
+          profile.full_name ?? ''
+        )
+
+        if (
+          profile.plan === 'pro' ||
+          profile.plan === 'premium'
+        ) {
+          setCurrentPlan(profile.plan)
+        } else {
+          setCurrentPlan(null)
+        }
+
+        setLoading(false)
+      } catch (error) {
         console.error(
-          'Erreur récupération utilisateur :',
-          authError
+          'Erreur inattendue chargement abonnement :',
+          error
         )
 
         if (mounted) {
           setLoading(false)
         }
 
-        router.push('/login')
-        return
-      }
+        /**
+         * On ne redirige vers login que si l'erreur
+         * correspond réellement à une absence de session.
+         */
+        const message =
+          error instanceof Error
+            ? error.message.toLowerCase()
+            : ''
 
-      if (!user) {
-        if (mounted) {
-          setLoading(false)
+        if (
+          message.includes(
+            'auth session missing'
+          ) ||
+          message.includes(
+            'session missing'
+          )
+        ) {
+          router.replace('/login')
         }
-
-        router.push('/login')
-        return
       }
-
-      const {
-        data: profile,
-        error: profileError,
-      } = await supabase
-        .from('profiles')
-        .select(
-          'full_name,user_type,plan,subscription_status'
-        )
-        .eq('id', user.id)
-        .single()
-
-      if (profileError || !profile) {
-        console.error(
-          'Erreur récupération profil :',
-          profileError
-        )
-
-        if (mounted) {
-          setLoading(false)
-        }
-
-        return
-      }
-
-      if (profile.user_type !== 'agence') {
-        if (mounted) {
-          setLoading(false)
-        }
-
-        router.push('/mon-espace')
-        return
-      }
-
-      if (!mounted) {
-        return
-      }
-
-      setAgenceName(
-        profile.full_name ?? ''
-      )
-
-      if (
-        profile.plan === 'pro' ||
-        profile.plan === 'premium'
-      ) {
-        setCurrentPlan(profile.plan)
-      } else {
-        setCurrentPlan(null)
-      }
-
-      setLoading(false)
     }
 
     loadProfile()
 
+    /**
+     * Écoute des changements d'authentification.
+     *
+     * Si Supabase déconnecte l'utilisateur,
+     * on le renvoie vers login.
+     */
+    const {
+      data: authListener,
+    } =
+      supabase.auth.onAuthStateChange(
+        (_event, session) => {
+          if (
+            !session?.user &&
+            mounted
+          ) {
+            router.replace('/login')
+          }
+        }
+      )
+
     return () => {
       mounted = false
+      authListener.subscription.unsubscribe()
     }
-  }, [router, supabase])
+  }, [router])
 
+  /**
+   * ============================================================
+   * CALCUL DU TOTAL
+   * ============================================================
+   */
   function getTotal() {
     if (!selectedPlan) {
       return 0
@@ -204,13 +344,23 @@ export default function AbonnementPage() {
       selectedPlan.monthly_price *
       selectedDuree.months
 
-    if (selectedDuree.months === 3) {
+    /**
+     * 3 mois = 5% de réduction.
+     */
+    if (
+      selectedDuree.months === 3
+    ) {
       total = Math.round(
         total * 0.95
       )
     }
 
-    if (selectedDuree.months === 12) {
+    /**
+     * 12 mois = 10 mois payés.
+     */
+    if (
+      selectedDuree.months === 12
+    ) {
       total =
         selectedPlan.monthly_price * 10
     }
@@ -218,6 +368,11 @@ export default function AbonnementPage() {
     return total
   }
 
+  /**
+   * ============================================================
+   * COPIER LE NUMÉRO
+   * ============================================================
+   */
   async function copyNumber() {
     try {
       await navigator.clipboard.writeText(
@@ -237,11 +392,19 @@ export default function AbonnementPage() {
     }
   }
 
+  /**
+   * ============================================================
+   * ENVOI DE LA PREUVE
+   * ============================================================
+   */
   async function handleSendConfirmation() {
     if (sending) {
       return
     }
 
+    /**
+     * Vérifications frontend.
+     */
     if (!paymentProof) {
       alert(
         'Veuillez sélectionner la capture de votre paiement.'
@@ -291,41 +454,54 @@ export default function AbonnementPage() {
     setSending(true)
 
     try {
+      /**
+       * ========================================================
+       * 1. VÉRIFIER LA SESSION
+       * ========================================================
+       */
       const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser()
+        data: sessionData,
+        error: sessionError,
+      } =
+        await supabase.auth.getSession()
 
-      if (authError) {
+      if (sessionError) {
         console.error(
-          'Erreur authentification :',
-          authError
+          'Erreur récupération session :',
+          sessionError
         )
 
         alert(
-          "Votre session n'est plus valide. Veuillez vous reconnecter."
+          "Impossible de vérifier votre session. Veuillez vous reconnecter."
         )
 
-        router.push('/login')
+        router.replace('/login')
         return
       }
 
-      if (!user) {
+      const session =
+        sessionData.session
+
+      if (!session?.user) {
         alert(
           'Votre session a expiré. Veuillez vous reconnecter.'
         )
 
-        router.push('/login')
+        router.replace('/login')
         return
       }
 
-      /*
-       * Nom de fichier sécurisé.
+      const user =
+        session.user
+
+      /**
+       * ========================================================
+       * 2. NOM DE FICHIER SÉCURISÉ
+       * ========================================================
        *
-       * Structure :
        * payment-proofs/
-       *   user-id/
-       *     uuid.extension
+       *   USER_ID/
+       *     UUID.extension
        */
       const extension =
         paymentProof.name
@@ -351,23 +527,26 @@ export default function AbonnementPage() {
       const fileName =
         `${user.id}/${crypto.randomUUID()}.${safeExtension}`
 
-      /*
-       * UPLOAD DE LA PREUVE
+      /**
+       * ========================================================
+       * 3. UPLOAD
+       * ========================================================
        */
       const {
         error: uploadError,
-      } = await supabase.storage
-        .from('payment-proofs')
-        .upload(
-          fileName,
-          paymentProof,
-          {
-            cacheControl: '3600',
-            contentType:
-              paymentProof.type,
-            upsert: false,
-          }
-        )
+      } =
+        await supabase.storage
+          .from('payment-proofs')
+          .upload(
+            fileName,
+            paymentProof,
+            {
+              cacheControl: '3600',
+              contentType:
+                paymentProof.type,
+              upsert: false,
+            }
+          )
 
       if (uploadError) {
         console.error(
@@ -376,8 +555,8 @@ export default function AbonnementPage() {
         )
 
         const message =
-          uploadError.message?.toLowerCase() ??
-          ''
+          uploadError.message
+            ?.toLowerCase() ?? ''
 
         if (
           message.includes(
@@ -391,7 +570,7 @@ export default function AbonnementPage() {
           )
         ) {
           alert(
-            "L'envoi de la preuve est bloqué par les permissions de stockage. Vérifiez les policies du bucket payment-proofs."
+            "L'envoi de la preuve est bloqué par les permissions du bucket payment-proofs."
           )
         } else if (
           message.includes(
@@ -421,14 +600,19 @@ export default function AbonnementPage() {
         return
       }
 
-      /*
-       * URL publique de la preuve
+      /**
+       * ========================================================
+       * 4. GÉNÉRER L'URL PUBLIQUE
+       * ========================================================
        */
       const {
         data: publicUrlData,
-      } = supabase.storage
-        .from('payment-proofs')
-        .getPublicUrl(fileName)
+      } =
+        supabase.storage
+          .from('payment-proofs')
+          .getPublicUrl(
+            fileName
+          )
 
       const screenshotUrl =
         publicUrlData.publicUrl
@@ -439,6 +623,15 @@ export default function AbonnementPage() {
           fileName
         )
 
+        /**
+         * Nettoyage du fichier uploadé.
+         */
+        await supabase.storage
+          .from('payment-proofs')
+          .remove([
+            fileName,
+          ])
+
         alert(
           "La preuve a été envoyée mais son URL n'a pas pu être générée."
         )
@@ -446,27 +639,45 @@ export default function AbonnementPage() {
         return
       }
 
-      /*
-       * ENREGISTREMENT DE LA DEMANDE
+      /**
+       * ========================================================
+       * 5. ENREGISTRER LA DEMANDE DE PAIEMENT
+       * ========================================================
        */
       const {
         error: submissionError,
-      } = await supabase
-        .from('payment_submissions')
-        .insert({
-          agent_id: user.id,
-          plan_requested:
-            selectedPlan.code,
-          months_requested:
-            selectedDuree.months,
-          amount: getTotal(),
-          reseau_paiement:
-            selectedMoyen.id,
-          screenshot_url:
-            screenshotUrl,
-          status: 'pending',
-        })
+      } =
+        await supabase
+          .from(
+            'payment_submissions'
+          )
+          .insert({
+            agent_id:
+              user.id,
 
+            plan_requested:
+              selectedPlan.code,
+
+            months_requested:
+              selectedDuree.months,
+
+            amount:
+              getTotal(),
+
+            reseau_paiement:
+              selectedMoyen.id,
+
+            screenshot_url:
+              screenshotUrl,
+
+            status:
+              'pending',
+          })
+
+      /**
+       * Si l'enregistrement échoue,
+       * on supprime la preuve orpheline.
+       */
       if (submissionError) {
         console.error(
           'Erreur création payment_submissions :',
@@ -474,8 +685,10 @@ export default function AbonnementPage() {
         )
 
         await supabase.storage
-         .from('payment-proofs')
-         .remove([fileName])
+          .from('payment-proofs')
+          .remove([
+            fileName,
+          ])
 
         alert(
           `La preuve a été envoyée, mais la demande de paiement n'a pas pu être enregistrée : ${submissionError.message}`
@@ -484,8 +697,10 @@ export default function AbonnementPage() {
         return
       }
 
-      /*
-       * Succès
+      /**
+       * ========================================================
+       * 6. SUCCÈS
+       * ========================================================
        */
       setPaymentProof(null)
       setStep('confirm')
@@ -511,8 +726,10 @@ export default function AbonnementPage() {
     }
   }
 
-  /*
+  /**
+   * ============================================================
    * LOADING
+   * ============================================================
    */
   if (
     loading ||
@@ -525,17 +742,12 @@ export default function AbonnementPage() {
     )
   }
 
-  /*
+  /**
+   * ============================================================
    * ÉTAPE 1 — PLANS
+   * ============================================================
    */
   if (step === 'plans') {
-    const availablePlans =
-      plans.filter(
-        (plan) =>
-          plan.code === 'pro' ||
-          plan.code === 'premium'
-      )
-
     return (
       <div className="min-h-screen bg-[#f7f7f5]">
         <div className="mx-auto max-w-7xl px-4 py-8">
@@ -614,8 +826,10 @@ export default function AbonnementPage() {
     )
   }
 
-  /*
+  /**
+   * ============================================================
    * ÉTAPE 2 — CHECKOUT
+   * ============================================================
    */
   if (
     step === 'checkout' &&
@@ -689,11 +903,10 @@ export default function AbonnementPage() {
     )
   }
 
-  /*
+  /**
+   * ============================================================
    * ÉTAPE 3 — CONFIRMATION
-   *
-   * selectedPlan est vérifié avant
-   * d'être transmis à ConfirmationCard.
+   * ============================================================
    */
   if (
     step === 'confirm' &&
@@ -709,10 +922,10 @@ export default function AbonnementPage() {
     )
   }
 
-  /*
-   * Sécurité :
-   * aucun état incohérent ne doit
-   * afficher une page vide.
+  /**
+   * ============================================================
+   * ÉTAT INCOHÉRENT
+   * ============================================================
    */
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#f7f7f5]">
