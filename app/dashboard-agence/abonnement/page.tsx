@@ -41,8 +41,8 @@ const MOYENS_PAIEMENT = [
     logo: 'M',
   },
   {
-    id: 'mix_by_yas',
-    name: 'Mix by Yas',
+    id: 'mixx_by_yas',
+    name: 'Mixx by Yas',
     number: '+228 73 06 32 83',
     logo: 'Y',
   },
@@ -472,6 +472,10 @@ export default function AbonnementPage() {
           'Erreur création payment_submissions :',
           submissionError
         )
+
+        await supabase.storage
+         .from('payment-proofs')
+         .remove([fileName])
 
         alert(
           `La preuve a été envoyée, mais la demande de paiement n'a pas pu être enregistrée : ${submissionError.message}`
