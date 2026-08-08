@@ -35,13 +35,13 @@ const DUREES = [
 
 const MOYENS_PAIEMENT = [
   {
-    id: 'Moov',
+    id: 'moov_money',
     name: 'Moov Money',
     number: '+228 97 63 06 90',
     logo: 'M',
   },
   {
-    id: 'Yas',
+    id: 'mix_by_yas',
     name: 'Mix by Yas',
     number: '+228 73 06 32 83',
     logo: 'Y',
